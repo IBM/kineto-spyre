@@ -43,6 +43,7 @@ EventTypeMap = {
     'operator': EventTypes.OPERATOR,
     'runtime': EventTypes.RUNTIME,
     'cuda_runtime': EventTypes.RUNTIME, # Support new Kineto naming convention
+    'privateuse1_runtime': EventTypes.RUNTIME,
     'kernel': EventTypes.KERNEL,
     'memcpy': EventTypes.MEMCPY,
     'gpu_memcpy': EventTypes.MEMCPY,
