@@ -26,8 +26,7 @@ def get_version(rel_path):
 
 INSTALL_REQUIRED = [
     "pandas >= 1.0.0",
-    "tensorboard >= 1.15, !=2.1.0",
-    "aiu-trace-analyzer"
+    "tensorboard >= 1.15, !=2.1.0"
 ]
 
 TESTS_REQUIRED = INSTALL_REQUIRED + [
@@ -39,7 +38,8 @@ EXTRAS = {
     "s3": ["boto3"],
     "blob": ["azure-storage-blob"],
     "gs": ["google-cloud-storage"],
-    "hdfs": ["fsspec", "pyarrow"]
+    "hdfs": ["fsspec", "pyarrow"],
+    "aiu": ["aiu-trace-analyzer"]
 }
 
 
@@ -78,8 +78,7 @@ setuptools.setup(
     },
     packages=setuptools.find_packages(),
     package_data={
-        "torch_tb_profiler": ["static/**",
-                              "acelyzer/profiles/*.json",],
+        "torch_tb_profiler": ["static/**"],
     },
     entry_points={
         "tensorboard_plugins": [
