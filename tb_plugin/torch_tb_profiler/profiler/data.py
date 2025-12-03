@@ -171,7 +171,8 @@ class RunProfileData:
                 json_reencode = True
 
         # run Acelyzer for AIU-specific trace preprocessing
-        if trace_json.get('deviceProperties', [{}])[0].get('type') == 'AIU':
+        device_props = trace_json.get('deviceProperties')
+        if device_props and len(device_props) > 0 and device_props[0].get('type') == 'AIU':
             trace_json, json_reencode = run_acelyzer(trace_path, trace_json, json_reencode)
         
         if json_reencode:
