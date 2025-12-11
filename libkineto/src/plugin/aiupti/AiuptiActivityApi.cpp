@@ -220,8 +220,7 @@ void AiuptiActivityApi::enableAiuptiActivities(
     if (activity == ActivityType::GPU_MEMSET) {
       // memset requires memory be also enabled
       AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_MEMORY));
-      // do not track memset events because they are the same as memory allocation events
-      // AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_MEMSET));
+      AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_MEMSET));
       activityEnabled = true;
     }
     if (activity == ActivityType::CONCURRENT_KERNEL) {
@@ -254,8 +253,7 @@ void AiuptiActivityApi::enableAiuptiActivities(
       AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_MEMCPY2));
       AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_SYNCHRONIZATION));
       AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_MEMORY));
-      // do not track memset events because they are the same as memory allocation events
-      // AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_MEMSET));
+      AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_MEMSET));
       AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_CMPT));
       if (!privateUseCPUActivityEnabled) {
         AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_RUNTIME));
@@ -284,7 +282,7 @@ void AiuptiActivityApi::disablePtiActivities(
     }
     if (activity == ActivityType::GPU_MEMSET) {
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMORY));
-      // AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMSET));
+      AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMSET));
       activityEnabled = true;
     }
     if (activity == ActivityType::CONCURRENT_KERNEL) {
@@ -314,7 +312,7 @@ void AiuptiActivityApi::disablePtiActivities(
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMCPY2));
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_SYNCHRONIZATION));
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMORY));
-      // AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMSET));
+      AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMSET));
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_CMPT));
       if (!privateUseCPUActivityEnabled) {
         AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_RUNTIME));
