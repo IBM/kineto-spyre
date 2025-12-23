@@ -271,41 +271,41 @@ void AiuptiActivityApi::enableAiuptiActivities(
 void AiuptiActivityApi::disablePtiActivities(
     const std::set<ActivityType>& selected_activities) {
 #ifdef HAS_AIUPTI
-  bool activityEnabled = false;
-  bool privateUseCPUActivityEnabled = false;
+  bool activityDisabled = false;
+  bool privateUseCPUActivityDisabled = false;
   for (const auto& activity : selected_activities) {
     if (activity == ActivityType::GPU_MEMCPY) {
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMCPY));
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMCPY2));
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_SYNCHRONIZATION));
-      activityEnabled = true;
+      activityDisabled = true;
     }
     if (activity == ActivityType::GPU_MEMSET) {
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMORY));
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMSET));
-      activityEnabled = true;
+      activityDisabled = true;
     }
     if (activity == ActivityType::CONCURRENT_KERNEL) {
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_CMPT));
-      activityEnabled = true;
+      activityDisabled = true;
     }
     // if (activity == ActivityType::EXTERNAL_CORRELATION) {
     //   AIUPTI_CALL(aiuptiActivityDisable(EXTERNAL_CORRELATION));
     // }
     if (activity == ActivityType::PRIVATEUSE1_RUNTIME) {
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_RUNTIME));
-      privateUseCPUActivityEnabled = true;
+      privateUseCPUActivityDisabled = true;
     }
     if (activity == ActivityType::PRIVATEUSE1_DRIVER) {
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_DRIVER));
-      privateUseCPUActivityEnabled = true;
+      privateUseCPUActivityDisabled = true;
     }
     // if (activity == ActivityType::OVERHEAD) {
     //   AIUPTI_CALL(aiuptiActivityDisable(OVERHEAD));
     // }
   }
 
-  if (activityEnabled == false) {
+  if (activityDisabled == false) {
     const char* env_value = std::getenv("ProfilerActivity");
     if (env_value != nullptr && std::string(env_value) == "PrivateUse1") {
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMCPY));
@@ -314,7 +314,7 @@ void AiuptiActivityApi::disablePtiActivities(
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMORY));
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMSET));
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_CMPT));
-      if (!privateUseCPUActivityEnabled) {
+      if (!privateUseCPUActivityDisabled) {
         AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_RUNTIME));
         AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_DRIVER));
       }
