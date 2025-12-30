@@ -96,7 +96,11 @@ function clone_pytorch() {
     rm -rf third_party/kineto
     cp -r ${_KINETO_DIR} third_party/kineto
   else
-    echo "PyTorch repo already exists. Doing nothing..."
+    echo "PyTorch repo already exists"
+    echo "Replacing Kineto with the aiu-kineto"
+    cd pytorch
+    rm -rf third_party/kineto
+    cp -r ${_KINETO_DIR} third_party/kineto
   fi
 }
 
