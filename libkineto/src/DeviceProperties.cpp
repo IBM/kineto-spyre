@@ -10,6 +10,7 @@
 
 #include <fmt/format.h>
 #include <fmt/ranges.h>
+#include <algorithm>
 #include <vector>
 
 #if defined(HAS_CUPTI)
@@ -215,9 +216,8 @@ float kernelOccupancy(
         blockSize,
         dynamicSmemSize);
     if (status == CUDA_OCC_SUCCESS) {
-      if (occ_result.activeBlocksPerMultiprocessor < blocksPerSm) {
-        blocksPerSm = occ_result.activeBlocksPerMultiprocessor;
-      }
+      blocksPerSm = std::min<float>(
+          occ_result.activeBlocksPerMultiprocessor, blocksPerSm);
       occupancy = blocksPerSm * blockSize /
           (float)props[deviceId].maxThreadsPerMultiProcessor;
     } else {
