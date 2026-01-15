@@ -51,10 +51,10 @@ such as static `mlk` for x86 among others.
 ./scripts/build_pytorch.sh
 ```
 
-This script will generate a wheel file in `$PYTORCH_SRC/dist`, and you can install PyTorch with the following command:
+This script will generate a wheel file in `$PYTORCH_SRC/pytorch/dist`, and you can install PyTorch with the following command:
 
 ```bash
-pip3 install --no-deps --force-reinstall --user $PYTORCH_SRC/dist/*.whl
+pip3 install --no-deps --force-reinstall --user $PYTORCH_SRC/pytorch/dist/*.whl
 ```
 
 > We recommend using the `--no-deps` option with `pip3 install` to prevent unwanted library upgrades that could potentially break the environment.
