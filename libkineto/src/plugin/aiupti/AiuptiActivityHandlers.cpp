@@ -251,9 +251,7 @@ void AiuptiActivityProfilerSession::handleKernelActivity(
   const ITraceActivity* linked =
       linkedActivity(activity->correlation_id, cpuCorrelationMap_);
   traceBuffer_.emplace_activity(
-    traceBuffer_.span,
-    ActivityType::CONCURRENT_KERNEL,
-    activity->name);
+      traceBuffer_.span, ActivityType::CONCURRENT_KERNEL, activity->name);
   auto& kernel_activity = traceBuffer_.activities.back();
   kernel_activity->startTime = activity->start;
   kernel_activity->endTime = activity->end;
