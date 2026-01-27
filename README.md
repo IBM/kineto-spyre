@@ -1,6 +1,17 @@
 # Kineto
 
 Kineto is a library used in the PyTorch Profiler.
+# kineto-spyre with libaiupti support
+Kineto extension for IBM Spyre card. This is a stop-gap repo before the kineto Spyre upstream version shows up in public PyTorch (2.10.x expected)
+Specifically, this repo is a modified version of libKineto that implements the support to collect events from libAIUpti.
+
+See the [here](docs/devel/README.md) for more details how to install and use it.
+
+The last upstream sync was with the commit `e44f60925593b7cd95e2606e9af2bf14f658dbb3`.
+
+# Kineto
+
+Kineto is part of the PyTorch Profiler.
 
 The Kineto project enables:
 - **performance observability and diagnostics** across common ML bottleneck components

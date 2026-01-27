@@ -42,6 +42,8 @@ EventTypeMap = {
     'cpu_op': EventTypes.OPERATOR,
     'operator': EventTypes.OPERATOR,
     'runtime': EventTypes.RUNTIME,
+    'cuda_runtime': EventTypes.RUNTIME, # Support new Kineto naming convention
+    'privateuse1_runtime': EventTypes.RUNTIME,
     'kernel': EventTypes.KERNEL,
     'memcpy': EventTypes.MEMCPY,
     'gpu_memcpy': EventTypes.MEMCPY,
@@ -88,6 +90,7 @@ class KernelEvent(DurationEvent):
         self.regs_per_thread = self.args.get('registers per thread')
         self.shared_memory = self.args.get('shared memory')
         self.device_id = self.args.get('device')
+        self.core_used = self.args.get('core used')
 
 
 class OperatorEvent(DurationEvent):

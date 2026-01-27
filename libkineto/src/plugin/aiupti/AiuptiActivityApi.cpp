@@ -56,8 +56,7 @@ void AiuptiActivityApi::popCorrelationID(CorrelationFlowType type) {
 static bool
 nextActivityRecord(uint8_t* buffer, size_t valid_size, Pti_Activity*& record) {
 #ifdef HAS_AIUPTI
-  AIUpti_ResultTypes status =
-      aiuptiActivityGetNextRecord(buffer, valid_size, &record);
+  AIUpti_ResultTypes status = aiuptiActivityGetNextRecord(buffer, valid_size, &record);
   if (status != AIUpti_ResultTypes::AIUPTI_SUCCESS) {
     record = nullptr;
   }
@@ -71,16 +70,12 @@ void AiuptiActivityApi::setMaxBufferSize(int size) {
 }
 
 void AiuptiActivityApi::bufferRequestedTrampoline(
-    uint8_t** buffer,
-    size_t* size,
-    size_t* maxNumRecords) {
+    uint8_t **buffer, size_t *size, size_t *maxNumRecords) {
   singleton().bufferRequested(buffer, size, maxNumRecords);
 }
 
-void AiuptiActivityApi::bufferRequested(
-    uint8_t** buffer,
-    size_t* size,
-    size_t* maxNumRecords) {
+void AiuptiActivityApi::bufferRequested(uint8_t **buffer, size_t *size,
+                                        size_t *maxNumRecords) {
   std::lock_guard<std::mutex> guard(mutex_);
   if (allocatedAiuTraceBuffers_.size() >= maxAiuBufferCount_) {
     stopCollection = true;
@@ -98,12 +93,11 @@ void AiuptiActivityApi::bufferRequested(
   *maxNumRecords = 0;
 }
 
-std::unique_ptr<AiuptiActivityBufferDeque>
-AiuptiActivityApi::activityBuffers() {
+std::unique_ptr<AiuptiActivityBufferDeque> AiuptiActivityApi::activityBuffers() {
   {
     std::lock_guard<std::mutex> guard(mutex_);
 
-    // Unlike other backends, aiuptiFlushAllActivities flushes all pending
+    // Differently other backends, aiuptiFlushAllActivities flushes all pending
     // requests and triggers bufferCompleted, which transfers
     // allocatedAiuTraceBuffers_ to readyAiuTraceBuffers_. Therefore, we check
     // the readyAiuTraceBuffers_ deque here.
@@ -123,9 +117,8 @@ AiuptiActivityApi::activityBuffers() {
 
 #ifdef HAS_AIUPTI
 int AiuptiActivityApi::processActivitiesForBuffer(
-    uint8_t* buf,
-    size_t validSize,
-    std::function<void(const Pti_Activity*)> handler) {
+    uint8_t *buf, size_t validSize,
+    std::function<void(const Pti_Activity *)> handler) {
   int count = 0;
   if (buf && validSize) {
     Pti_Activity* record{nullptr};
@@ -153,7 +146,7 @@ const std::pair<int, int> AiuptiActivityApi::processActivities(
 }
 
 void AiuptiActivityApi::clearActivities() {
-  // TODO(mamaral): verify
+  // TODO(mamaral): verify if we can uncomment this, probably not
   // {
   //   std::lock_guard<std::mutex> guard(mutex_);
   //   if (allocatedAiuTraceBuffers_.empty()) {
@@ -166,7 +159,7 @@ void AiuptiActivityApi::clearActivities() {
 #ifdef HAS_AIUPTI
   AIUPTI_CALL(aiuptiFlushAllActivities());
 #endif
-  // TODO(mamaral): verify
+  // TODO(mamaral): verify if we can uncomment this, probably not
   // std::lock_guard<std::mutex> guard(mutex_);
   // readyAiuTraceBuffers_ = nullptr;
 }
@@ -179,16 +172,14 @@ void AiuptiActivityApi::bufferCompletedTrampoline(
   singleton().bufferCompleted(buffer, size, validSize);
 }
 
-void AiuptiActivityApi::bufferCompleted(
-    uint8_t* buffer,
-    size_t size,
-    size_t validSize) {
+void AiuptiActivityApi::bufferCompleted(uint8_t *buffer, size_t size,
+                                        size_t validSize) {
   std::lock_guard<std::mutex> guard(mutex_);
   auto& it = allocatedAiuTraceBuffers_.front();
 
   if (it.first != buffer) {
     LOG(ERROR) << "bufferCompleted called with unknown buffer: "
-               << (void*)buffer;
+               << (void *)buffer;
     return;
   }
 
@@ -212,11 +203,12 @@ void AiuptiActivityApi::bufferCompleted(
 #endif
 
 void AiuptiActivityApi::enableAiuptiActivities(
-    const std::set<ActivityType>& selected_activities) {
+    const std::set<ActivityType> &selected_activities) {
 #ifdef HAS_AIUPTI
-  AIUPTI_CALL(aiuptiActivityRegisterCallbacks(
-      bufferRequestedTrampoline, bufferCompletedTrampoline));
+  AIUPTI_CALL(aiuptiActivityRegisterCallbacks(bufferRequestedTrampoline,
+                                              bufferCompletedTrampoline));
   bool activityEnabled = false;
+  bool privateUseCPUActivityEnabled = false;
   externalCorrelationEnabled_ = false;
   for (const auto& activity : selected_activities) {
     if (activity == ActivityType::GPU_MEMCPY) {
@@ -228,25 +220,32 @@ void AiuptiActivityApi::enableAiuptiActivities(
     if (activity == ActivityType::GPU_MEMSET) {
       // memset requires memory be also enabled
       AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_MEMORY));
+      AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_MEMSET));
       activityEnabled = true;
     }
     if (activity == ActivityType::CONCURRENT_KERNEL) {
       AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_CMPT));
       activityEnabled = true;
     }
+    // if (activity == ActivityType::EXTERNAL_CORRELATION) {
+    //   AIUPTI_CALL(aiuptiActivityEnable(EXTERNAL_CORRELATION));
+    //   externalCorrelationEnabled_ = true;
+    // }
     if (activity == ActivityType::PRIVATEUSE1_RUNTIME) {
       AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_RUNTIME));
-      activityEnabled = true;
+      privateUseCPUActivityEnabled = true;
     }
     if (activity == ActivityType::PRIVATEUSE1_DRIVER) {
       AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_DRIVER));
-      activityEnabled = true;
+      privateUseCPUActivityEnabled = true;
     }
+    // if (activity == ActivityType::OVERHEAD) {
+    //   AIUPTI_CALL(aiuptiActivityEnable(OVERHEAD));
+    // }
   }
 
-  // PyTorch version older than 2.6.0 does not have profile
-  // ProfilerActivity.PrivateUse1 therefore we need to enable it via environment
-  // variable.
+  // PyTorch version older than 2.6.0 does not have profile ProfilerActivity.PrivateUse1
+  // therefore we need to enable it via environment variable.
   if (activityEnabled == false) {
     const char* env_value = std::getenv("ProfilerActivity");
     if (env_value != nullptr && std::string(env_value) == "PrivateUse1") {
@@ -254,11 +253,12 @@ void AiuptiActivityApi::enableAiuptiActivities(
       AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_MEMCPY2));
       AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_SYNCHRONIZATION));
       AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_MEMORY));
-      // do not track memset events because they are the same as memory
-      // allocation events
+      AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_MEMSET));
       AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_CMPT));
-      AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_RUNTIME));
-      AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_DRIVER));
+      if (!privateUseCPUActivityEnabled) {
+        AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_RUNTIME));
+        AIUPTI_CALL(aiuptiActivityEnable(AIUPTI_ACTIVITY_KIND_DRIVER));
+      }
     }
   }
 
@@ -272,6 +272,7 @@ void AiuptiActivityApi::disablePtiActivities(
     const std::set<ActivityType>& selected_activities) {
 #ifdef HAS_AIUPTI
   bool activityEnabled = false;
+  bool privateUseCPUActivityEnabled = false;
   for (const auto& activity : selected_activities) {
     if (activity == ActivityType::GPU_MEMCPY) {
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMCPY));
@@ -281,20 +282,27 @@ void AiuptiActivityApi::disablePtiActivities(
     }
     if (activity == ActivityType::GPU_MEMSET) {
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMORY));
+      AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMSET));
       activityEnabled = true;
     }
     if (activity == ActivityType::CONCURRENT_KERNEL) {
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_CMPT));
       activityEnabled = true;
     }
+    // if (activity == ActivityType::EXTERNAL_CORRELATION) {
+    //   AIUPTI_CALL(aiuptiActivityDisable(EXTERNAL_CORRELATION));
+    // }
     if (activity == ActivityType::PRIVATEUSE1_RUNTIME) {
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_RUNTIME));
-      activityEnabled = true;
+      privateUseCPUActivityEnabled = true;
     }
     if (activity == ActivityType::PRIVATEUSE1_DRIVER) {
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_DRIVER));
-      activityEnabled = true;
+      privateUseCPUActivityEnabled = true;
     }
+    // if (activity == ActivityType::OVERHEAD) {
+    //   AIUPTI_CALL(aiuptiActivityDisable(OVERHEAD));
+    // }
   }
 
   if (activityEnabled == false) {
@@ -304,9 +312,12 @@ void AiuptiActivityApi::disablePtiActivities(
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMCPY2));
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_SYNCHRONIZATION));
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMORY));
+      AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_MEMSET));
       AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_CMPT));
-      AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_RUNTIME));
-      AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_DRIVER));
+      if (!privateUseCPUActivityEnabled) {
+        AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_RUNTIME));
+        AIUPTI_CALL(aiuptiActivityDisable(AIUPTI_ACTIVITY_KIND_DRIVER));
+      }
     }
   }
   externalCorrelationEnabled_ = false;

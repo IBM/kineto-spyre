@@ -418,18 +418,14 @@ export const DiffOverview: React.FC<IProps> = (props: IProps) => {
     ColumnUnderlyingData[]
   >([])
 
-  const [
-    rootUnderlyingData,
-    setRootUnderlyingData
-  ] = React.useState<ColumnUnderlyingData>()
+  const [rootUnderlyingData, setRootUnderlyingData] =
+    React.useState<ColumnUnderlyingData>()
 
   const [columnChartData, setColumnChartData] = React.useState<any[]>([])
   const [stepChartData, setStepChartData] = React.useState<any[]>([])
 
-  const [
-    selectedTableColumnsOptions,
-    setSelectedTableColumnsOptions
-  ] = React.useState<[key: string]>(['hostDuration'])
+  const [selectedTableColumnsOptions, setSelectedTableColumnsOptions] =
+    React.useState<[key: string]>(['hostDuration'])
   const [selectedTableColumns, setSelectedTableColumns] = React.useState<any[]>(
     [...baseTableColumns, ...hostDurationColumns]
   )
@@ -532,11 +528,11 @@ export const DiffOverview: React.FC<IProps> = (props: IProps) => {
     let tempLeftNameSet: string[] = []
     let tempRightNameSet: string[] = []
 
-    for (let i = 0; i < selectedUnderlyingData.leftAggs.length; i++){
+    for (let i = 0; i < selectedUnderlyingData.leftAggs.length; i++) {
       tempLeftNameSet.push(selectedUnderlyingData.leftAggs[i].name)
     }
 
-    for (let j = 0; j < selectedUnderlyingData.rightAggs.length; j++){
+    for (let j = 0; j < selectedUnderlyingData.rightAggs.length; j++) {
       tempRightNameSet.push(selectedUnderlyingData.rightAggs[j].name)
     }
 
@@ -544,14 +540,15 @@ export const DiffOverview: React.FC<IProps> = (props: IProps) => {
       let left = selectedUnderlyingData.leftAggs[i]
       let right: any = null
       let idxRight = tempRightNameSet.indexOf(left.name)
-      if (idxRight != -1){
+      if (idxRight != -1) {
         right = selectedUnderlyingData.rightAggs[idxRight]
 
         let deltaCallsPercentNumber =
-        ((right.calls - left.calls) / left.calls) * 100
+          ((right.calls - left.calls) / left.calls) * 100
 
         let deltaHostDurationPercentNumber =
-          ((right.host_duration - left.host_duration) / left.host_duration) * 100
+          ((right.host_duration - left.host_duration) / left.host_duration) *
+          100
 
         let deltaSelfHostDurationPercentNumber =
           ((right.self_host_duration - left.self_host_duration) /
@@ -589,7 +586,8 @@ export const DiffOverview: React.FC<IProps> = (props: IProps) => {
           expSelfHostDuration: right.self_host_duration,
           deltaSelfHostDuration:
             right.self_host_duration - left.self_host_duration,
-          deltaSelfHostDurationPercentNumber: deltaSelfHostDurationPercentNumber,
+          deltaSelfHostDurationPercentNumber:
+            deltaSelfHostDurationPercentNumber,
           deltaSelfHostDurationPercent: toPercentString(
             deltaSelfHostDurationPercentNumber
           ),
@@ -606,14 +604,14 @@ export const DiffOverview: React.FC<IProps> = (props: IProps) => {
           expSelfDeviceDuration: right.self_device_duration,
           deltaSelfDeviceDuration:
             right.self_device_duration - left.self_device_duration,
-          deltaSelfDeviceDurationPercentNumber: deltaSelfDeviceDurationPercentNumber,
+          deltaSelfDeviceDurationPercentNumber:
+            deltaSelfDeviceDurationPercentNumber,
           deltaSelfDeviceDurationPercent: toPercentString(
             deltaSelfDeviceDurationPercentNumber
           )
         })
       } else {
-        let deltaCallsPercentNumber =
-        ((0 - left.calls) / left.calls) * 100
+        let deltaCallsPercentNumber = ((0 - left.calls) / left.calls) * 100
 
         let deltaKernelCallsPercentNumber =
           ((0 - left.kernel_calls) / left.kernel_calls) * 100
@@ -622,19 +620,13 @@ export const DiffOverview: React.FC<IProps> = (props: IProps) => {
           ((0 - left.host_duration) / left.host_duration) * 100
 
         let deltaSelfHostDurationPercentNumber =
-          ((0 - left.self_host_duration) /
-            left.self_host_duration) *
-          100
+          ((0 - left.self_host_duration) / left.self_host_duration) * 100
 
         let deltaDeviceDurationPercentNumber =
-          ((0 - left.device_duration) /
-            left.device_duration) *
-          100
+          ((0 - left.device_duration) / left.device_duration) * 100
 
         let deltaSelfDeviceDurationPercentNumber =
-          ((0 - left.self_device_duration) /
-            left.self_device_duration) *
-          100
+          ((0 - left.self_device_duration) / left.self_device_duration) * 100
 
         tableDataSource.push({
           key: i,
@@ -655,9 +647,9 @@ export const DiffOverview: React.FC<IProps> = (props: IProps) => {
 
           baselineSelfHostDuration: left.self_host_duration,
           expSelfHostDuration: 0,
-          deltaSelfHostDuration:
-            0 - left.self_host_duration,
-          deltaSelfHostDurationPercentNumber: deltaSelfHostDurationPercentNumber,
+          deltaSelfHostDuration: 0 - left.self_host_duration,
+          deltaSelfHostDurationPercentNumber:
+            deltaSelfHostDurationPercentNumber,
           deltaSelfHostDurationPercent: toPercentString(
             deltaSelfHostDurationPercentNumber
           ),
@@ -672,9 +664,9 @@ export const DiffOverview: React.FC<IProps> = (props: IProps) => {
 
           baselineSelfDeviceDuration: left.self_device_duration,
           expSelfDeviceDuration: 0,
-          deltaSelfDeviceDuration:
-            0 - left.self_device_duration,
-          deltaSelfDeviceDurationPercentNumber: deltaSelfDeviceDurationPercentNumber,
+          deltaSelfDeviceDuration: 0 - left.self_device_duration,
+          deltaSelfDeviceDurationPercentNumber:
+            deltaSelfDeviceDurationPercentNumber,
           deltaSelfDeviceDurationPercent: toPercentString(
             deltaSelfDeviceDurationPercentNumber
           )
@@ -683,37 +675,28 @@ export const DiffOverview: React.FC<IProps> = (props: IProps) => {
     }
 
     let newIdx = selectedUnderlyingData.leftAggs.length - 1
-    for (let k = 0; k < selectedUnderlyingData.rightAggs.length; k++){
+    for (let k = 0; k < selectedUnderlyingData.rightAggs.length; k++) {
       let right = selectedUnderlyingData.rightAggs[k]
-      if (tempLeftNameSet.indexOf(right.name) != -1){
+      if (tempLeftNameSet.indexOf(right.name) != -1) {
         continue
       }
-      
+
       newIdx += 1
 
-      let deltaCallsPercentNumber =
-      ((right.calls - 0) / 0) * 100
+      let deltaCallsPercentNumber = ((right.calls - 0) / 0) * 100
 
-      let deltaKernelCallsPercentNumber =
-        ((right.kernel_calls - 0) / 0) * 100
+      let deltaKernelCallsPercentNumber = ((right.kernel_calls - 0) / 0) * 100
 
-      let deltaHostDurationPercentNumber =
-        ((right.host_duration - 0) / 0) * 100
+      let deltaHostDurationPercentNumber = ((right.host_duration - 0) / 0) * 100
 
       let deltaSelfHostDurationPercentNumber =
-        ((right.self_host_duration - 0) /
-          0) *
-        100
+        ((right.self_host_duration - 0) / 0) * 100
 
       let deltaDeviceDurationPercentNumber =
-        ((right.device_duration - 0) /
-          0) *
-        100
+        ((right.device_duration - 0) / 0) * 100
 
       let deltaSelfDeviceDurationPercentNumber =
-        ((right.self_device_duration - 0) /
-          0) *
-        100
+        ((right.self_device_duration - 0) / 0) * 100
 
       tableDataSource.push({
         key: newIdx,
@@ -734,8 +717,7 @@ export const DiffOverview: React.FC<IProps> = (props: IProps) => {
 
         baselineSelfHostDuration: 0,
         expSelfHostDuration: right.self_host_duration,
-        deltaSelfHostDuration:
-          right.self_host_duration - 0,
+        deltaSelfHostDuration: right.self_host_duration - 0,
         deltaSelfHostDurationPercentNumber: deltaSelfHostDurationPercentNumber,
         deltaSelfHostDurationPercent: toPercentString(
           deltaSelfHostDurationPercentNumber
@@ -751,9 +733,9 @@ export const DiffOverview: React.FC<IProps> = (props: IProps) => {
 
         baselineSelfDeviceDuration: 0,
         expSelfDeviceDuration: right.self_device_duration,
-        deltaSelfDeviceDuration:
-          right.self_device_duration - 0,
-        deltaSelfDeviceDurationPercentNumber: deltaSelfDeviceDurationPercentNumber,
+        deltaSelfDeviceDuration: right.self_device_duration - 0,
+        deltaSelfDeviceDurationPercentNumber:
+          deltaSelfDeviceDurationPercentNumber,
         deltaSelfDeviceDurationPercent: toPercentString(
           deltaSelfDeviceDurationPercentNumber
         )

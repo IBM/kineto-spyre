@@ -5,6 +5,7 @@
 # pyre-unsafe
 from collections import defaultdict
 from typing import Any, Dict, Iterable, List, Optional, Tuple, Union
+import re
 
 from . import consts, utils
 from .profiler.diffrun import compare_op_tree, diff_summary
@@ -128,6 +129,8 @@ class RunProfile:
         self.kernel_table = None
         self.tc_pie = None
         self.trace_file_path: str = None
+        self.device_type = None
+        self.core = None
 
         self.gpu_metrics = None
 
@@ -143,25 +146,21 @@ class RunProfile:
         self.pl_module_stats: Optional[List(Stats)] = None
 
     def append_gpu_metrics(self, raw_data: bytes):
-        counter_json_str = '{}'.format(', '.join(self.gpu_metrics))
+        counter_json_str = ', {}'.format(', '.join(self.gpu_metrics))
         counter_json_bytes = bytes(counter_json_str, 'utf-8')
 
-        # find '"traceEvents": [' via regex to allow single/double quotes and spaces in between
-        import re
-        pattern = rb"(['\"])traceEvents\1\s*:\s*\["
-        match = re.search(pattern, raw_data)
+        # Insert utilization counters directly after last trace event
+        trace_events_start = raw_data.find(b'"traceEvents": [')
+
+        pattern = re.compile(rb'}\s*]')
+        match = pattern.search(raw_data, trace_events_start)
         if not match:
-            raise ValueError("Could not find 'traceEvents' key in the raw_data")
-        matched = match.group(0)
-        pos = match.start(0)
-        raw_data = b"".join(
-            [
-                raw_data[: pos + len(matched)],
-                counter_json_bytes,
-                b",",
-                raw_data[pos + len(matched) :],
-            ]
-        )
+            raise ValueError("traceEvents wasn't closed in the trace file")
+
+        trace_events_end = match.start() + 1  # insert right after '}'
+        
+        raw_data = b''.join([raw_data[:trace_events_end], counter_json_bytes, raw_data[trace_events_end:]])
+
         import gzip
         raw_data = gzip.compress(raw_data, 1)
         return raw_data

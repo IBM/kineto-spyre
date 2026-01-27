@@ -10,10 +10,12 @@ import re
 import tempfile
 from json.decoder import JSONDecodeError
 from typing import Dict, List, Optional
+import os
 
 from .. import io, utils
 from ..utils import href
 from . import trace
+from ..device.aiu_utils import run_acelyzer
 from .communication import analyze_communication_nodes
 from .event_parser import CommLibTypes, EventParser, ProfileRole
 from .gpu_metrics_parser import GPUMetricsParser
@@ -38,6 +40,11 @@ class RunProfileData:
         self.data_schema_version = trace_json.get('schemaVersion', None)
         self.distributed_info = trace_json.get('distributedInfo', None)
         self.device_props = trace_json.get('deviceProperties', None)
+        self.device_type = 'GPU'
+        self.core = 'Tensor Core'
+        if self.device_props:
+            self.device_type = self.device_props[0].get('type', 'GPU')
+            self.core = self.device_props[0].get('core', 'Tensor Core')
 
         self.profiler_start_ts = float('inf')
         self.events: List[BaseEvent] = []
@@ -163,7 +170,13 @@ class RunProfileData:
                 del trace_json['traceEvents'][end_index]
                 json_reencode = True
 
+        # run Acelyzer for AIU-specific trace preprocessing
+        device_props = trace_json.get('deviceProperties')
+        if device_props and len(device_props) > 0 and device_props[0].get('type') == 'AIU':
+            trace_json, json_reencode = run_acelyzer(trace_path, trace_json, json_reencode)
+        
         if json_reencode:
+            print("Re-encoding the processed trace to a temporary file.")
             fp = tempfile.NamedTemporaryFile('w+t', suffix='.json.gz', dir=cache_dir, delete=False)
             fp.close()
             with gzip.open(fp.name, mode='wt') as fzip:
@@ -211,7 +224,7 @@ class RunProfileData:
 
         logger.debug('GPUMetricsParser')
         self.gpu_metrics_parser = GPUMetricsParser.parse_events(
-            self.events, parser.global_start_ts, parser.global_end_ts, parser.steps[0][0], parser.steps[-1][1])
+            self.events, parser.global_start_ts, parser.global_end_ts, parser.steps[0][0], parser.steps[-1][1], self.device_type)
 
         logger.debug('TensorCoresParser')
         tensorcores_parser = TensorCoresParser.parse_events(
@@ -229,7 +242,7 @@ class RunProfileData:
 
         memory_events = self._memory_events()
         if memory_events:
-            memory_parser = MemoryParser(memory_events)
+            memory_parser = MemoryParser(memory_events, self.device_type)
             self.memory_snapshot = memory_parser.find_memory_nodes(self.tid2tree)
 
     def analyze(self):

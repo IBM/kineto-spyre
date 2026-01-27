@@ -1,0 +1,68 @@
+#!/usr/bin/env -S python -u
+
+import sys
+import subprocess
+import os
+from importlib.util import spec_from_file_location, module_from_spec
+from importlib.machinery import SourceFileLoader
+import torch
+from torch_sendnn import torch_sendnn
+from torch.profiler import profile, record_function, ProfilerActivity
+
+def main():
+    if len(sys.argv) < 2:
+        print(f"Usage: python {sys.argv[0]} <filename> [params...]")
+        sys.exit(1)
+
+    filename = sys.argv[1]
+    params = sys.argv[2:]
+
+    if not os.path.isfile(filename):
+        print(f"Error: File '{filename}' does not exist.")
+        sys.exit(1)
+
+    torch_profiler_trace_dir = "logs"
+    activities = [torch.profiler.ProfilerActivity.CPU]
+    from torch_sendnn import torch_sendnn
+    torch.utils.rename_privateuse1_backend("aiu")
+    torch._register_device_module("aiu",
+                                    torch_sendnn.sendnn_backend)
+    torch.utils.generate_methods_for_privateuse1_backend()
+    activities.append(torch.profiler.ProfilerActivity.PrivateUse1)
+
+    prof = torch.profiler.profile(
+        activities=activities,
+        record_shapes=True,
+        with_stack=True,
+        on_trace_ready=torch.profiler.tensorboard_trace_handler(
+            torch_profiler_trace_dir))
+
+    del sys.argv[0]
+
+    cmd = os.path.abspath(sys.argv[0])
+    sys.path.insert(0, os.path.dirname(cmd))
+
+    loader = SourceFileLoader("__main__", cmd)
+
+    prof.start()
+    
+    try:
+        spec = spec_from_file_location('__main__', cmd, loader=loader)
+        if spec is None or spec.loader is None:
+            print(f"Error: Could not load spec for '{cmd}'")
+            sys.exit(1)
+        mod = module_from_spec(spec)
+        sys.modules['__main__'] = mod
+        spec.loader.exec_module(mod)
+    except SystemExit as e:
+        print(f"error:{e.code}")
+
+    prof.stop()
+
+    print("profile output by CPU time")
+    print(prof.key_averages().table(sort_by="cpu_time_total", row_limit=10).replace("CUDA", "AIU"))
+    print("profile output by AIU time")
+    print(prof.key_averages().table(sort_by="cuda_time_total", row_limit=10).replace("CUDA", "AIU"))
+
+if __name__ == "__main__":
+    main()
