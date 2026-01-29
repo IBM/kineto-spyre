@@ -316,7 +316,7 @@ inline uint32_t getBaseResourceId(const AIUpti_ActivityMemory* activity) {
 }
 
 inline uint32_t getBaseResourceId(const AIUpti_ActivityMemset* activity) {
-  return 500;
+  return 400; // put memset and memory release on the same PID
 }
 
 template <class memory_activity_type>
