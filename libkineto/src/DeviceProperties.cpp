@@ -126,6 +126,21 @@ int smCount(uint32_t deviceId) {
   const std::vector<gpuDeviceProp>& props = deviceProps();
   return deviceId >= props.size() ? 0 : props[deviceId].multiProcessorCount;
 }
+#elif defined(HAS_AIUPTI)
+// TODO(mcalman): add additional device properties (e.g. memory) and support multiple devices
+const std::string& devicePropertiesJson() {
+  static std::string aiu_properties = fmt::format(
+    R"JSON(
+  {{
+    "id": {}, "type": "{}", "name": "{}",
+    "core": "{}"
+  }})JSON",
+    0,
+    "AIU",
+    "AIU",
+    "PT Array");
+    return aiu_properties;
+}
 #else
 const std::string& devicePropertiesJson() {
   static std::string devicePropsJson;
