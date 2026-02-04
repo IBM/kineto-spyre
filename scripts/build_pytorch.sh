@@ -8,7 +8,7 @@ ARCH="$(uname -m)"
 # ------------------------
 
 PYTORCH_VERSION="2.9.1"
-KINETO_VERSION="1.1"
+KINETO_VERSION="1.1.1"
 PYTORCH_BUILD_SUFFIX="+aiu.kineto."$KINETO_VERSION
 CONDA_ENV_NAME="buildenv-torch"
 CONDA_DIR="$HOME/miniconda"
