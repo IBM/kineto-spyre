@@ -114,6 +114,7 @@ static std::string createDevicePropertiesJson(
 static std::string createDevicePropertiesJson() {
   std::vector<std::string> jsonProps;
   const auto& props = deviceProps();
+  jsonProps.reserve(props.size());
   for (size_t i = 0; i < props.size(); i++) {
     jsonProps.push_back(createDevicePropertiesJson(i, props[i]));
   }
