@@ -237,9 +237,11 @@ if(NOT LIBKINETO_NOROCTRACER)
   find_library(ROCTRACER_LIBRARY NAMES libroctracer64.so HINTS
     ${ROCM_SOURCE_DIR}/lib)
   target_link_libraries(kineto "${ROCTRACER_LIBRARY}")
+  target_link_libraries(kineto_base PUBLIC "${ROCTRACER_LIBRARY}")
   find_library(KINETO_HIP_LIBRARY NAMES libamdhip64.so HINTS
     ${ROCM_SOURCE_DIR}/lib)
   target_link_libraries(kineto "${KINETO_HIP_LIBRARY}")
+  target_link_libraries(kineto_base PUBLIC "${KINETO_HIP_LIBRARY}")
 elseif(NOT LIBKINETO_NOCUPTI)
   target_link_libraries(kineto PUBLIC CUDA::cupti CUDA::cudart)
   target_link_libraries(kineto_base PUBLIC CUDA::cupti CUDA::cudart)
@@ -263,6 +265,18 @@ if(KINETO_BUILD_TESTS)
     if(DEFINED LIBKINETO_NOXPUPTI AND NOT LIBKINETO_NOXPUPTI)
       set_property(TARGET gtest PROPERTY POSITION_INDEPENDENT_CODE ON)
     endif()
+  endif()
+  if(NOT TARGET nlohmann_json)
+    # nlohmann/json v3.10.5 declares cmake_minimum_required(VERSION 3.1),
+    # which CMake 4.x rejects. Allow it via CMAKE_POLICY_VERSION_MINIMUM.
+    # TODO: should we just take a direct third-party dependency on
+    #       nlohmann/json?
+    set(_saved_cmake_policy_version_minimum "${CMAKE_POLICY_VERSION_MINIMUM}")
+    set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+    add_subdirectory(
+      "${LIBKINETO_THIRDPARTY_DIR}/dynolog/third_party/json"
+      "${LIBKINETO_BINARY_DIR}/json")
+    set(CMAKE_POLICY_VERSION_MINIMUM "${_saved_cmake_policy_version_minimum}")
   endif()
   enable_testing()
   add_subdirectory(test)
