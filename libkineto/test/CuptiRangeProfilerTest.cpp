@@ -37,8 +37,8 @@ using namespace KINETO_NAMESPACE;
 
 #if HAS_CUPTI_RANGE_PROFILER
 
-std::unordered_map<int, CuptiProfilerResult>&
-MockCuptiRBProfilerSession::getResults() {
+std::unordered_map<int, CuptiProfilerResult>& MockCuptiRBProfilerSession::
+    getResults() {
   static std::unordered_map<int, CuptiProfilerResult> results;
   return results;
 }

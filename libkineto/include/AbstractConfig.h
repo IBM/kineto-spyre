@@ -49,8 +49,7 @@ class AbstractConfig {
   }
 
   // Time config was created / updated
-  [[nodiscard]] std::chrono::time_point<std::chrono::system_clock> timestamp()
-      const {
+  [[nodiscard]] std::chrono::time_point<std::chrono::system_clock> timestamp() const {
     return timestamp_;
   }
 
@@ -83,9 +82,7 @@ class AbstractConfig {
   //
   // @param fallbackProfileStartTime Specify a fallback profile start timestamp
   // in case it was never specified by the client
-  virtual void validate(
-      const std::chrono::time_point<std::chrono::system_clock>&
-          fallbackProfileStartTime) = 0;
+  virtual void validate(const std::chrono::time_point<std::chrono::system_clock>& fallbackProfileStartTime) = 0;
 
   // TODO: Separate out each profiler type into features?
   virtual void printActivityProfilerConfig(std::ostream& s) const;
@@ -93,17 +90,13 @@ class AbstractConfig {
 
   // Helpers for use in handleOption
   // Split a string by delimiter and remove external white space
-  [[nodiscard]] std::vector<std::string> splitAndTrim(
-      const std::string& s,
-      char delim) const;
+  [[nodiscard]] std::vector<std::string> splitAndTrim(const std::string& s, char delim) const;
   // Lowercase for case-insensitive comparisons
   std::string toLower(std::string& s) const;
   // Does string end with suffix
-  [[nodiscard]] bool endsWith(const std::string& s, const std::string& suffix)
-      const;
+  [[nodiscard]] bool endsWith(const std::string& s, const std::string& suffix) const;
   // Conversions
-  [[nodiscard]] int64_t
-  toIntRange(const std::string& val, int64_t min, int64_t max) const;
+  [[nodiscard]] int64_t toIntRange(const std::string& val, int64_t min, int64_t max) const;
   [[nodiscard]] int32_t toInt32(const std::string& val) const;
   [[nodiscard]] int64_t toInt64(const std::string& val) const;
   bool toBool(std::string& val) const;

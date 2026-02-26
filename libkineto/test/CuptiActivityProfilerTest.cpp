@@ -145,8 +145,10 @@ struct MockCuptiActivityBuffer {
     activities.push_back(reinterpret_cast<CUpti_Activity*>(&act));
   }
 
-  void
-  addKernelActivity(int64_t start_ns, int64_t end_ns, int64_t correlation) {
+  void addKernelActivity(
+      int64_t start_ns,
+      int64_t end_ns,
+      int64_t correlation) {
     auto& act =
         createActivity<CUpti_ActivityKernel4>(start_ns, end_ns, correlation);
     act.kind = CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL;
@@ -159,8 +161,10 @@ struct MockCuptiActivityBuffer {
     activities.push_back(reinterpret_cast<CUpti_Activity*>(&act));
   }
 
-  void
-  addMemcpyActivity(int64_t start_ns, int64_t end_ns, int64_t correlation) {
+  void addMemcpyActivity(
+      int64_t start_ns,
+      int64_t end_ns,
+      int64_t correlation) {
     auto& act =
         createActivity<CUpti_ActivityMemcpy>(start_ns, end_ns, correlation);
     act.kind = CUPTI_ACTIVITY_KIND_MEMCPY;
@@ -187,8 +191,10 @@ struct MockCuptiActivityBuffer {
     activities.push_back(reinterpret_cast<CUpti_Activity*>(&act));
   }
 
-  void
-  addCollectiveActivity(int64_t start_ns, int64_t end_ns, int64_t correlation) {
+  void addCollectiveActivity(
+      int64_t start_ns,
+      int64_t end_ns,
+      int64_t correlation) {
     auto& act =
         createActivity<CUpti_ActivityKernel4>(start_ns, end_ns, correlation);
     act.name = "collective_gpu";

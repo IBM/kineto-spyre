@@ -38,24 +38,19 @@ class ActivityProfilerController : public ConfigLoader::ConfigHandler {
  public:
   explicit ActivityProfilerController(ConfigLoader& configLoader, bool cpuOnly);
   ActivityProfilerController(const ActivityProfilerController&) = delete;
-  ActivityProfilerController& operator=(const ActivityProfilerController&) =
-      delete;
+  ActivityProfilerController& operator=(const ActivityProfilerController&) = delete;
 
   ~ActivityProfilerController();
 
 #if !USE_GOOGLE_LOG
   static std::shared_ptr<LoggerCollector> getLoggerCollector();
-  static void setLoggerCollectorFactory(
-      const std::function<std::shared_ptr<LoggerCollector>()>& factory);
+  static void setLoggerCollectorFactory(const std::function<std::shared_ptr<LoggerCollector>()>& factory);
 #endif // !USE_GOOGLE_LOG
 
-  static void addLoggerFactory(
-      const std::string& protocol,
-      ActivityLoggerFactory::FactoryFunc factory);
+  static void addLoggerFactory(const std::string& protocol, ActivityLoggerFactory::FactoryFunc factory);
 
   static void setInvariantViolationsLoggerFactory(
-      const std::function<std::unique_ptr<InvariantViolationsLogger>()>&
-          factory);
+      const std::function<std::unique_ptr<InvariantViolationsLogger>()>& factory);
 
   // These API are used for On-Demand Tracing.
   bool canAcceptConfig() override;
@@ -79,11 +74,10 @@ class ActivityProfilerController : public ConfigLoader::ConfigHandler {
 
   void addMetadata(const std::string& key, const std::string& value);
 
-  void logInvariantViolation(
-      const std::string& profile_id,
-      const std::string& assertion,
-      const std::string& error,
-      const std::string& group_profile_id = "");
+  void logInvariantViolation(const std::string& profile_id,
+                             const std::string& assertion,
+                             const std::string& error,
+                             const std::string& group_profile_id = "");
 
   void pushCorrelationId(uint64_t id);
 
@@ -95,8 +89,7 @@ class ActivityProfilerController : public ConfigLoader::ConfigHandler {
 
  private:
   bool shouldActivateIterationConfig(int64_t currentIter);
-  bool shouldActivateTimestampConfig(
-      const std::chrono::time_point<std::chrono::system_clock>& now);
+  bool shouldActivateTimestampConfig(const std::chrono::time_point<std::chrono::system_clock>& now);
   void profilerLoop();
   void memoryProfilerLoop();
   void activateConfig(std::chrono::time_point<std::chrono::system_clock> now);

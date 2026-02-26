@@ -135,9 +135,9 @@ void ChromeTraceLogger::metadataToJSON(
   }
 }
 
-std::unordered_map<std::string, std::string>
-ChromeTraceLogger::addEnvVarsToMetadata(
-    const std::unordered_map<std::string, std::string>& metadata) {
+std::unordered_map<std::string, std::string> ChromeTraceLogger::
+    addEnvVarsToMetadata(
+        const std::unordered_map<std::string, std::string>& metadata) {
   // Get environment metadata from the EnvMetadata module
   auto combined = libkineto::getEnvMetadata();
   // Original metadata takes precedence

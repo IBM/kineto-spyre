@@ -105,13 +105,13 @@ void XpuptiActivityProfilerSession::processTrace(
   processTrace(logger);
 }
 
-std::unique_ptr<libkineto::CpuTraceBuffer>
-XpuptiActivityProfilerSession::getTraceBuffer() {
+std::unique_ptr<libkineto::CpuTraceBuffer> XpuptiActivityProfilerSession::
+    getTraceBuffer() {
   return std::make_unique<libkineto::CpuTraceBuffer>(std::move(traceBuffer_));
 }
 
-std::vector<libkineto::ResourceInfo>
-XpuptiActivityProfilerSession::getResourceInfos() {
+std::vector<libkineto::ResourceInfo> XpuptiActivityProfilerSession::
+    getResourceInfos() {
   std::vector<libkineto::ResourceInfo> result;
   for (const auto [device_id, sycl_queue_id] : resourceInfo_) {
     result.emplace_back(

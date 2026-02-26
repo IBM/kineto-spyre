@@ -167,8 +167,10 @@ struct MockRoctracerLogger {
     activities_.push_back(row);
   }
 
-  void
-  addKernelActivity(int64_t start_ns, int64_t end_ns, int64_t correlation) {
+  void addKernelActivity(
+      int64_t start_ns,
+      int64_t end_ns,
+      int64_t correlation) {
     roctracerAsyncRow* row = new roctracerAsyncRow(
         correlation,
         ACTIVITY_DOMAIN_HIP_API,
@@ -182,8 +184,10 @@ struct MockRoctracerLogger {
     activities_.push_back(row);
   }
 
-  void
-  addMemcpyH2DActivity(int64_t start_ns, int64_t end_ns, int64_t correlation) {
+  void addMemcpyH2DActivity(
+      int64_t start_ns,
+      int64_t end_ns,
+      int64_t correlation) {
     roctracerAsyncRow* row = new roctracerAsyncRow(
         correlation,
         ACTIVITY_DOMAIN_HIP_API,
@@ -197,8 +201,10 @@ struct MockRoctracerLogger {
     activities_.push_back(row);
   }
 
-  void
-  addMemcpyD2HActivity(int64_t start_ns, int64_t end_ns, int64_t correlation) {
+  void addMemcpyD2HActivity(
+      int64_t start_ns,
+      int64_t end_ns,
+      int64_t correlation) {
     roctracerAsyncRow* row = new roctracerAsyncRow(
         correlation,
         ACTIVITY_DOMAIN_HIP_API,

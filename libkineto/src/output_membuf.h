@@ -63,19 +63,16 @@ class MemoryTraceLogger : public ActivityLogger {
     addActivityWrapper(activity);
   }
 
-  void handleTraceStart(
-      const std::unordered_map<std::string, std::string>& metadata,
-      const std::string& device_properties) override {
+  void handleTraceStart(const std::unordered_map<std::string, std::string>& metadata,
+                        const std::string& device_properties) override {
     metadata_ = metadata;
     device_properties_ = device_properties;
   }
 
-  void finalizeTrace(
-      const Config& config,
-      std::unique_ptr<ActivityBuffers> buffers,
-      int64_t endTime,
-      std::unordered_map<std::string, std::vector<std::string>>& metadata)
-      override {
+  void finalizeTrace(const Config& config,
+                     std::unique_ptr<ActivityBuffers> buffers,
+                     int64_t endTime,
+                     std::unordered_map<std::string, std::vector<std::string>>& metadata) override {
     buffers_ = std::move(buffers);
     endTime_ = endTime;
   }
@@ -106,8 +103,7 @@ class MemoryTraceLogger : public ActivityLogger {
     logger.finalizeTrace(*config_, nullptr, endTime_, loggerMetadata_);
   }
 
-  void setLoggerMetadata(
-      std::unordered_map<std::string, std::vector<std::string>>&& lmd) {
+  void setLoggerMetadata(std::unordered_map<std::string, std::vector<std::string>>&& lmd) {
     loggerMetadata_ = std::move(lmd);
   }
 

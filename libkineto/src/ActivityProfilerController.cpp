@@ -50,8 +50,8 @@ void ActivityProfilerController::setLoggerCollectorFactory(
   loggerCollectorFactory() = factory();
 }
 
-std::shared_ptr<LoggerCollector>
-ActivityProfilerController::getLoggerCollector() {
+std::shared_ptr<LoggerCollector> ActivityProfilerController::
+    getLoggerCollector() {
   return loggerCollectorFactory();
 }
 #endif // !USE_GOOGLE_LOG
@@ -435,8 +435,8 @@ void ActivityProfilerController::popUserCorrelationId() {
   profiler_->popUserCorrelationId();
 }
 
-std::unique_ptr<ActivityTraceInterface>
-ActivityProfilerController::stopTrace() {
+std::unique_ptr<ActivityTraceInterface> ActivityProfilerController::
+    stopTrace() {
   profiler_->stopTrace(std::chrono::system_clock::now());
   UST_LOGGER_MARK_COMPLETED(kCollectionStage);
   auto logger = std::make_unique<MemoryTraceLogger>(profiler_->config());

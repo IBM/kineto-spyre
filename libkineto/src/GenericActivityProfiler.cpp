@@ -220,8 +220,8 @@ void GenericActivityProfiler::processTraceInternal(ActivityLogger& logger) {
   finalizeTrace(*config_, logger);
 }
 
-GenericActivityProfiler::CpuGpuSpanPair&
-GenericActivityProfiler::recordTraceSpan(TraceSpan& span, int gpuOpCount) {
+GenericActivityProfiler::CpuGpuSpanPair& GenericActivityProfiler::
+    recordTraceSpan(TraceSpan& span, int gpuOpCount) {
   TraceSpan gpu_span(gpuOpCount, span.iteration, span.name, "GPU: ");
   auto& iterations = traceSpans_[span.name];
   iterations.emplace_back(span, gpu_span);
@@ -307,8 +307,8 @@ void GenericActivityProfiler::GpuUserEventMap::insertOrExtendEvent(
   span.endTime = std::max(gpu_activity_end, span.endTime);
 }
 
-const GenericActivityProfiler::CpuGpuSpanPair&
-GenericActivityProfiler::defaultTraceSpan() {
+const GenericActivityProfiler::CpuGpuSpanPair& GenericActivityProfiler::
+    defaultTraceSpan() {
   static TraceSpan span(0, 0, "Unknown", "");
   static CpuGpuSpanPair span_pair(span, span);
   return span_pair;

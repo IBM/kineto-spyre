@@ -68,8 +68,8 @@ void AiuptiActivityProfilerSession::processTrace(
 }
 
 // TODO (mcalman): support multi-AIU
-std::unique_ptr<libkineto::DeviceInfo>
-AiuptiActivityProfilerSession::getDeviceInfo() {
+std::unique_ptr<libkineto::DeviceInfo> AiuptiActivityProfilerSession::
+    getDeviceInfo() {
   int32_t pid = processId();
   std::string process_name = processName(pid);
   int aiu = 0;
@@ -77,8 +77,8 @@ AiuptiActivityProfilerSession::getDeviceInfo() {
       aiu, aiu + kExceedMaxPid, process_name, fmt::format("AIU {}", 0));
 }
 
-std::vector<libkineto::ResourceInfo>
-AiuptiActivityProfilerSession::getResourceInfos() {
+std::vector<libkineto::ResourceInfo> AiuptiActivityProfilerSession::
+    getResourceInfos() {
   std::vector<libkineto::ResourceInfo> resourceInfos;
   for (const auto& entries : resourceInfo_) {
     resourceInfos.push_back(entries.second);
@@ -111,8 +111,8 @@ void AiuptiActivityProfilerSession::recordMemoryStream(
   }
 }
 
-std::unique_ptr<libkineto::CpuTraceBuffer>
-AiuptiActivityProfilerSession::getTraceBuffer() {
+std::unique_ptr<libkineto::CpuTraceBuffer> AiuptiActivityProfilerSession::
+    getTraceBuffer() {
   return std::make_unique<libkineto::CpuTraceBuffer>(std::move(traceBuffer_));
 }
 
@@ -150,20 +150,20 @@ const std::set<ActivityType>& AIUActivityProfiler::availableActivities() const {
   return kAiuTypes;
 }
 
-std::unique_ptr<libkineto::IActivityProfilerSession>
-AIUActivityProfiler::configure(
-    const std::set<ActivityType>& activity_types,
-    const libkineto::Config& config) {
+std::unique_ptr<libkineto::IActivityProfilerSession> AIUActivityProfiler::
+    configure(
+        const std::set<ActivityType>& activity_types,
+        const libkineto::Config& config) {
   return std::make_unique<AiuptiActivityProfilerSession>(
       AiuptiActivityApi::singleton(), config, activity_types);
 }
 
-std::unique_ptr<libkineto::IActivityProfilerSession>
-AIUActivityProfiler::configure(
-    int64_t ts_ms,
-    int64_t duration_ms,
-    const std::set<ActivityType>& activity_types,
-    const libkineto::Config& config) {
+std::unique_ptr<libkineto::IActivityProfilerSession> AIUActivityProfiler::
+    configure(
+        int64_t ts_ms,
+        int64_t duration_ms,
+        const std::set<ActivityType>& activity_types,
+        const libkineto::Config& config) {
   AsyncProfileStartTime_ = ts_ms;
   AsyncProfileEndTime_ = ts_ms + duration_ms;
   return configure(activity_types, config);

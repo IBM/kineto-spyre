@@ -15,8 +15,8 @@
 // Starting from CUDA 12.06 the Profiler API is superseded by Range Profiler API
 // This needs significant rework. See
 // https://docs.nvidia.com/cupti/main/main.html#evolution-of-the-profiling-apis
-#if defined(USE_CUPTI_RANGE_PROFILER) && defined(CUDART_VERSION) && \
-    CUDART_VERSION >= 10000 && CUDA_VERSION >= 11000 && CUDA_VERSION <= 12060
+#if defined(USE_CUPTI_RANGE_PROFILER) && defined(CUDART_VERSION) && CUDART_VERSION >= 10000 && \
+    CUDA_VERSION >= 11000 && CUDA_VERSION <= 12060
 #define HAS_CUPTI_RANGE_PROFILER 1
 #endif // CUDART_VERSION > 10.00 and CUDA_VERSION >= 11.00 and CUDA_VERSION
        // <= 12.06
@@ -81,9 +81,8 @@ class CuptiRBProfilerSession {
   // This function has to be called from the CPU thread running
   // the CUDA context. If this is not the case asyncStartAndEnable()
   // can be used
-  void start(
-      CUpti_ProfilerRange profilerRange = CUPTI_AutoRange,
-      CUpti_ProfilerReplayMode profilerReplayMode = CUPTI_KernelReplay) {
+  void start(CUpti_ProfilerRange profilerRange = CUPTI_AutoRange,
+             CUpti_ProfilerReplayMode profilerReplayMode = CUPTI_KernelReplay) {
     startInternal(profilerRange, profilerReplayMode);
   }
 
@@ -122,9 +121,8 @@ class CuptiRBProfilerSession {
 
   // Async APIs : these will can be called from another thread
   // outside the CUDA context being profiled
-  void asyncStartAndEnable(
-      CUpti_ProfilerRange profilerRange = CUPTI_AutoRange,
-      CUpti_ProfilerReplayMode profilerReplayMode = CUPTI_KernelReplay);
+  void asyncStartAndEnable(CUpti_ProfilerRange profilerRange = CUPTI_AutoRange,
+                           CUpti_ProfilerReplayMode profilerReplayMode = CUPTI_KernelReplay);
   void asyncDisableAndStop();
 
   void printMetrics() {
@@ -135,9 +133,7 @@ class CuptiRBProfilerSession {
 
   virtual CuptiProfilerResult evaluateMetrics(bool verbose = false);
 
-  void saveCounterData(
-      const std::string& CounterDataFileName,
-      const std::string& CounterDataSBFileName);
+  void saveCounterData(const std::string& CounterDataFileName, const std::string& CounterDataSBFileName);
 
   int deviceId() const {
     return deviceId_;
@@ -160,16 +156,13 @@ class CuptiRBProfilerSession {
   }
 
  protected:
-  virtual void startInternal(
-      CUpti_ProfilerRange profilerRange,
-      CUpti_ProfilerReplayMode profilerReplayMode);
+  virtual void startInternal(CUpti_ProfilerRange profilerRange, CUpti_ProfilerReplayMode profilerReplayMode);
 
   CUpti_ProfilerRange curRange_ = CUPTI_AutoRange;
   CUpti_ProfilerReplayMode curReplay_ = CUPTI_KernelReplay;
   bool has_gpu_activities_enabled_ = false;
 
-  std::chrono::time_point<std::chrono::high_resolution_clock> profilerStartTs_,
-      profilerStopTs_, profilerInitDoneTs_;
+  std::chrono::time_point<std::chrono::high_resolution_clock> profilerStartTs_, profilerStopTs_, profilerInitDoneTs_;
 
  private:
   bool createCounterDataImage();
@@ -202,32 +195,24 @@ class CuptiRBProfilerSession {
   bool profilingActive_ = false;
   bool unitTest_ = false;
 
-  friend void __trackCudaKernelLaunch(
-      CUcontext ctx,
-      const char* kernelName,
-      uint64_t correlation_id);
+  friend void __trackCudaKernelLaunch(CUcontext ctx, const char* kernelName, uint64_t correlation_id);
 };
 
 // Factory class used by the wrapping CuptiProfiler object
 struct ICuptiRBProfilerSessionFactory {
-  virtual std::unique_ptr<CuptiRBProfilerSession> make(
-      const CuptiRangeProfilerOptions& opts) = 0;
+  virtual std::unique_ptr<CuptiRBProfilerSession> make(const CuptiRangeProfilerOptions& opts) = 0;
   virtual ~ICuptiRBProfilerSessionFactory() {}
 };
 
 struct CuptiRBProfilerSessionFactory : ICuptiRBProfilerSessionFactory {
-  std::unique_ptr<CuptiRBProfilerSession> make(
-      const CuptiRangeProfilerOptions& opts) override;
+  std::unique_ptr<CuptiRBProfilerSession> make(const CuptiRangeProfilerOptions& opts) override;
 };
 
 // called directly only in unit tests
 namespace testing {
 
 void trackCudaCtx(CUcontext ctx, uint32_t device_id, CUpti_CallbackId cbid);
-void trackCudaKernelLaunch(
-    CUcontext ctx,
-    const char* kernelName,
-    uint64_t correlation_id);
+void trackCudaKernelLaunch(CUcontext ctx, const char* kernelName, uint64_t correlation_id);
 
 } // namespace testing
 

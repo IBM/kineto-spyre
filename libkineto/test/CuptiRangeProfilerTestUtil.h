@@ -20,8 +20,7 @@ namespace KINETO_NAMESPACE {
 
 class MockCuptiRBProfilerSession : public CuptiRBProfilerSession {
  public:
-  explicit MockCuptiRBProfilerSession(const CuptiRangeProfilerOptions& opts)
-      : CuptiRBProfilerSession(opts) {}
+  explicit MockCuptiRBProfilerSession(const CuptiRangeProfilerOptions& opts) : CuptiRBProfilerSession(opts) {}
 
   void beginPass() override {
     LOG(INFO) << " Mock CUPTI begin pass";
@@ -60,9 +59,7 @@ class MockCuptiRBProfilerSession : public CuptiRBProfilerSession {
   }
 
  protected:
-  void startInternal(
-      CUpti_ProfilerRange profilerRange,
-      CUpti_ProfilerReplayMode profilerReplayMode) override {
+  void startInternal(CUpti_ProfilerRange profilerRange, CUpti_ProfilerReplayMode profilerReplayMode) override {
     profilerStartTs_ = std::chrono::high_resolution_clock::now();
     curRange_ = profilerRange;
     curReplay_ = profilerReplayMode;
@@ -85,8 +82,7 @@ class MockCuptiRBProfilerSession : public CuptiRBProfilerSession {
 };
 
 struct MockCuptiRBProfilerSessionFactory : ICuptiRBProfilerSessionFactory {
-  std::unique_ptr<CuptiRBProfilerSession> make(
-      const CuptiRangeProfilerOptions& _opts) override {
+  std::unique_ptr<CuptiRBProfilerSession> make(const CuptiRangeProfilerOptions& _opts) override {
     auto opts = _opts;
     opts.unitTest = true;
     return std::make_unique<MockCuptiRBProfilerSession>(opts);
@@ -102,14 +98,10 @@ inline void simulateCudaContextCreate(CUcontext context, uint32_t dev) {
 }
 
 inline void simulateCudaContextDestroy(CUcontext context, uint32_t dev) {
-  testing::trackCudaCtx(
-      context, dev, CUPTI_CBID_RESOURCE_CONTEXT_DESTROY_STARTING);
+  testing::trackCudaCtx(context, dev, CUPTI_CBID_RESOURCE_CONTEXT_DESTROY_STARTING);
 }
 
-inline void simulateKernelLaunch(
-    CUcontext context,
-    const std::string& kernelName,
-    uint64_t correlation_id) {
+inline void simulateKernelLaunch(CUcontext context, const std::string& kernelName, uint64_t correlation_id) {
   testing::trackCudaKernelLaunch(context, kernelName.c_str(), correlation_id);
 }
 

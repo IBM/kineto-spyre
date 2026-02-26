@@ -48,8 +48,7 @@ class ConfigLoader {
 
   void removeHandler(ConfigKind kind, ConfigHandler* handler) {
     std::lock_guard<std::mutex> lock(updateThreadMutex_);
-    auto it =
-        std::find(handlers_[kind].begin(), handlers_[kind].end(), handler);
+    auto it = std::find(handlers_[kind].begin(), handlers_[kind].end(), handler);
     if (it != handlers_[kind].end()) {
       handlers_[kind].erase(it);
     }
@@ -84,8 +83,7 @@ class ConfigLoader {
 
   void handleOnDemandSignal();
 
-  static void setDaemonConfigLoaderFactory(
-      std::function<std::unique_ptr<IDaemonConfigLoader>()> factory);
+  static void setDaemonConfigLoaderFactory(std::function<std::unique_ptr<IDaemonConfigLoader>()> factory);
 
   std::string getConfString();
 
@@ -101,17 +99,12 @@ class ConfigLoader {
   void updateBaseConfig();
 
   // Create configuration when receiving SIGUSR2
-  void configureFromSignal(
-      std::chrono::time_point<std::chrono::system_clock> now,
-      Config& config);
+  void configureFromSignal(std::chrono::time_point<std::chrono::system_clock> now, Config& config);
 
   // Create configuration when receiving request from a daemon
-  void configureFromDaemon(
-      std::chrono::time_point<std::chrono::system_clock> now,
-      Config& config);
+  void configureFromDaemon(std::chrono::time_point<std::chrono::system_clock> now, Config& config);
 
-  std::string readOnDemandConfigFromDaemon(
-      std::chrono::time_point<std::chrono::system_clock> now);
+  std::string readOnDemandConfigFromDaemon(std::chrono::time_point<std::chrono::system_clock> now);
 
   const char* customConfigFileName();
 
