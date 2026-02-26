@@ -94,9 +94,7 @@ class Logger {
     return (!s[off] ? 57ull : (hash_rec(s, off + 1) * 293) ^ s[off]);
   }
   static constexpr const char* basename(const char* s, int off = 0) {
-    return !s[off]      ? s
-        : s[off] == '/' ? basename(&s[off + 1])
-                        : basename(s, off + 1);
+    return !s[off] ? s : s[off] == '/' ? basename(&s[off + 1]) : basename(s, off + 1);
   }
 
   static void setVerboseLogModules(const std::vector<std::string>& modules);
@@ -128,9 +126,7 @@ class Logger {
 
   static void setLoggerObserverOnDemand();
 
-  static void addLoggerObserverAddMetadata(
-      const std::string& key,
-      const std::string& value);
+  static void addLoggerObserverAddMetadata(const std::string& key, const std::string& value);
 
  private:
   std::stringstream buf_;
@@ -182,10 +178,10 @@ class VoidLogger {
 
 #define LOG_IS_ON(severity) (severity >= libkineto::Logger::severityLevel())
 
-#define LOG_IF(severity, condition)                                 \
-  !(LOG_IS_ON(severity) && (condition)) ? (void)0                   \
-                                        : libkineto::VoidLogger() & \
-          libkineto::Logger(severity, __LINE__, __FILE__).stream()
+#define LOG_IF(severity, condition)     \
+  !(LOG_IS_ON(severity) && (condition)) \
+      ? (void)0                         \
+      : libkineto::VoidLogger() & libkineto::Logger(severity, __LINE__, __FILE__).stream()
 
 #define LOG(severity) LOG_IF(severity, true)
 
@@ -195,39 +191,32 @@ class VoidLogger {
 
 #define LOG_OCCURRENCES LOCAL_VARNAME(log_count)
 
-#define LOG_EVERY_N(severity, rate)               \
-  static int LOG_OCCURRENCES = 0;                 \
-  LOG_IF(severity, LOG_OCCURRENCES++ % rate == 0) \
-      << "(x" << LOG_OCCURRENCES << ") "
+#define LOG_EVERY_N(severity, rate) \
+  static int LOG_OCCURRENCES = 0;   \
+  LOG_IF(severity, LOG_OCCURRENCES++ % rate == 0) << "(x" << LOG_OCCURRENCES << ") "
 
-#define LOG_FIRST_N(severity, threshold)          \
-  static int LOG_OCCURRENCES = 0;                 \
-  LOG_IF(severity, LOG_OCCURRENCES++ < threshold) \
-      << "(x" << LOG_OCCURRENCES << ") "
+#define LOG_FIRST_N(severity, threshold) \
+  static int LOG_OCCURRENCES = 0;        \
+  LOG_IF(severity, LOG_OCCURRENCES++ < threshold) << "(x" << LOG_OCCURRENCES << ") "
 
 template <uint64_t n>
 struct __to_constant__ {
   static const uint64_t val = n;
 };
-#define FILENAME_HASH                      \
-  __to_constant__<libkineto::Logger::hash( \
-      libkineto::Logger::basename(__FILE__))>::val
+#define FILENAME_HASH __to_constant__<libkineto::Logger::hash(libkineto::Logger::basename(__FILE__))>::val
 #define VLOG_IS_ON(verbosity)                           \
   (libkineto::Logger::verboseLogLevel() >= verbosity && \
    (libkineto::Logger::verboseLogModules() & FILENAME_HASH) == FILENAME_HASH)
 
-#define VLOG_IF(verbosity, condition) \
-  LOG_IF(VERBOSE, VLOG_IS_ON(verbosity) && (condition))
+#define VLOG_IF(verbosity, condition) LOG_IF(VERBOSE, VLOG_IS_ON(verbosity) && (condition))
 
 #define VLOG(verbosity) VLOG_IF(verbosity, true)
 
-#define VLOG_EVERY_N(verbosity, rate)               \
-  static int LOG_OCCURRENCES = 0;                   \
-  VLOG_IF(verbosity, LOG_OCCURRENCES++ % rate == 0) \
-      << "(x" << LOG_OCCURRENCES << ") "
+#define VLOG_EVERY_N(verbosity, rate) \
+  static int LOG_OCCURRENCES = 0;     \
+  VLOG_IF(verbosity, LOG_OCCURRENCES++ % rate == 0) << "(x" << LOG_OCCURRENCES << ") "
 
-#define PLOG(severity) \
-  libkineto::Logger(severity, __LINE__, __FILE__, errno).stream()
+#define PLOG(severity) libkineto::Logger(severity, __LINE__, __FILE__, errno).stream()
 
 #define SET_LOG_SEVERITY_LEVEL(level) libkineto::Logger::setSeverityLevel(level)
 
@@ -236,39 +225,30 @@ struct __to_constant__ {
   libkineto::Logger::setVerboseLogModules(modules)
 
 // Logging the set of devices the trace is collect on.
-#define LOGGER_OBSERVER_ADD_DEVICE(device_count) \
-  libkineto::Logger::addLoggerObserverDevice(device_count)
+#define LOGGER_OBSERVER_ADD_DEVICE(device_count) libkineto::Logger::addLoggerObserverDevice(device_count)
 
 // Incrementing the number of events collected by this trace.
-#define LOGGER_OBSERVER_ADD_EVENT_COUNT(count) \
-  libkineto::Logger::addLoggerObserverEventCount(count)
+#define LOGGER_OBSERVER_ADD_EVENT_COUNT(count) libkineto::Logger::addLoggerObserverEventCount(count)
 
 // Record duration of trace in milliseconds.
-#define LOGGER_OBSERVER_SET_TRACE_DURATION_MS(duration) \
-  libkineto::Logger::setLoggerObserverTraceDurationMS(duration)
+#define LOGGER_OBSERVER_SET_TRACE_DURATION_MS(duration) libkineto::Logger::setLoggerObserverTraceDurationMS(duration)
 
 // Record the trace id when given.
-#define LOGGER_OBSERVER_SET_TRACE_ID(tid) \
-  libkineto::Logger::setLoggerObserverTraceID(tid)
+#define LOGGER_OBSERVER_SET_TRACE_ID(tid) libkineto::Logger::setLoggerObserverTraceID(tid)
 
 // Record the group trace id when given.
-#define LOGGER_OBSERVER_SET_GROUP_TRACE_ID(gtid) \
-  libkineto::Logger::setLoggerObserverGroupTraceID(gtid)
+#define LOGGER_OBSERVER_SET_GROUP_TRACE_ID(gtid) libkineto::Logger::setLoggerObserverGroupTraceID(gtid)
 
 // Log the set of destinations the trace is sent to.
-#define LOGGER_OBSERVER_ADD_DESTINATION(dest) \
-  libkineto::Logger::addLoggerObserverDestination(dest)
+#define LOGGER_OBSERVER_ADD_DESTINATION(dest) libkineto::Logger::addLoggerObserverDestination(dest)
 
 // Record this was triggered by On-Demand.
-#define LOGGER_OBSERVER_SET_TRIGGER_ON_DEMAND() \
-  libkineto::Logger::setLoggerObserverOnDemand()
+#define LOGGER_OBSERVER_SET_TRIGGER_ON_DEMAND() libkineto::Logger::setLoggerObserverOnDemand()
 
 // Record this was triggered by On-Demand.
-#define LOGGER_OBSERVER_ADD_METADATA(key, value) \
-  libkineto::Logger::addLoggerObserverAddMetadata(key, value)
+#define LOGGER_OBSERVER_ADD_METADATA(key, value) libkineto::Logger::addLoggerObserverAddMetadata(key, value)
 
 // UST Logger Semantics to describe when a stage is complete.
-#define UST_LOGGER_MARK_COMPLETED(stage) \
-  LOG(libkineto::LoggerOutputType::STAGE) << "Completed Stage: " << stage
+#define UST_LOGGER_MARK_COMPLETED(stage) LOG(libkineto::LoggerOutputType::STAGE) << "Completed Stage: " << stage
 
 #endif // USE_GOOGLE_LOG

@@ -17,8 +17,7 @@ constexpr char kCollectionStage[] = "Collection";
 constexpr char kPostProcessingStage[] = "Post Processing";
 
 // Special string in UST for determining if traces are empty
-constexpr char kEmptyTrace[] =
-    "No Valid Trace Events (CPU/GPU) found. Outputting empty trace.";
+constexpr char kEmptyTrace[] = "No Valid Trace Events (CPU/GPU) found. Outputting empty trace.";
 
 #if !USE_GOOGLE_LOG
 
@@ -34,14 +33,7 @@ constexpr char kEmptyTrace[] =
 
 namespace libkineto {
 
-enum LoggerOutputType {
-  VERBOSE = 0,
-  INFO = 1,
-  WARNING = 2,
-  STAGE = 3,
-  ERROR = 4,
-  ENUM_COUNT = 5
-};
+enum LoggerOutputType { VERBOSE = 0, INFO = 1, WARNING = 2, STAGE = 3, ERROR = 4, ENUM_COUNT = 5 };
 
 const char* toString(LoggerOutputType t);
 LoggerOutputType toLoggerOutputType(const std::string& str);
@@ -52,8 +44,7 @@ class ILoggerObserver {
  public:
   virtual ~ILoggerObserver() = default;
   virtual void write(const std::string& message, LoggerOutputType ot) = 0;
-  virtual const std::map<LoggerOutputType, std::vector<std::string>>
-  extractCollectorMetadata() = 0;
+  virtual const std::map<LoggerOutputType, std::vector<std::string>> extractCollectorMetadata() = 0;
   virtual void reset() = 0;
   virtual void addDevice(const int64_t device) = 0;
   virtual void setTraceDurationMS(const int64_t duration) = 0;
@@ -62,9 +53,7 @@ class ILoggerObserver {
   virtual void setGroupTraceID(const std::string& /*unused*/) {}
   virtual void addDestination(const std::string& dest) = 0;
   virtual void setTriggerOnDemand() {}
-  virtual void addMetadata(
-      const std::string& key,
-      const std::string& value) = 0;
+  virtual void addMetadata(const std::string& key, const std::string& value) = 0;
 };
 
 } // namespace libkineto

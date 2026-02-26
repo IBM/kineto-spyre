@@ -7,17 +7,14 @@
 
 namespace KINETO_NAMESPACE {
 
-class AiuptiActivityProfilerSession
-    : public libkineto::IActivityProfilerSession {
+class AiuptiActivityProfilerSession : public libkineto::IActivityProfilerSession {
  public:
   AiuptiActivityProfilerSession() = delete;
-  AiuptiActivityProfilerSession(
-      AiuptiActivityApi& api,
-      const libkineto::Config& config,
-      const std::set<ActivityType>& activity_types);
+  AiuptiActivityProfilerSession(AiuptiActivityApi& api,
+                                const libkineto::Config& config,
+                                const std::set<ActivityType>& activity_types);
   AiuptiActivityProfilerSession(const AiuptiActivityProfilerSession&) = delete;
-  AiuptiActivityProfilerSession& operator=(
-      const AiuptiActivityProfilerSession&) = delete;
+  AiuptiActivityProfilerSession& operator=(const AiuptiActivityProfilerSession&) = delete;
 
   ~AiuptiActivityProfilerSession();
 
@@ -27,11 +24,10 @@ class AiuptiActivityProfilerSession
     return errors_;
   };
   void processTrace(ActivityLogger& logger) override;
-  void processTrace(
-      ActivityLogger& logger,
-      libkineto::getLinkedActivityCallback get_linked_activity,
-      int64_t captureWindowStartTime,
-      int64_t captureWindowEndTime) override;
+  void processTrace(ActivityLogger& logger,
+                    libkineto::getLinkedActivityCallback get_linked_activity,
+                    int64_t captureWindowStartTime,
+                    int64_t captureWindowEndTime) override;
   std::unique_ptr<libkineto::DeviceInfo> getDeviceInfo() override;
   std::vector<libkineto::ResourceInfo> getResourceInfos() override;
   std::unique_ptr<libkineto::CpuTraceBuffer> getTraceBuffer() override;
@@ -46,24 +42,13 @@ class AiuptiActivityProfilerSession
   void removeCorrelatedPtiActivities(const ITraceActivity* act1);
   bool outOfRange(const ITraceActivity& act);
   int64_t getMappedQueueId(uint64_t sycl_queue_id);
-  const ITraceActivity* linkedActivity(
-      int32_t correlationId,
-      const std::unordered_map<int64_t, int64_t>& correlationMap);
-  void handleRuntimeActivity(
-      const AIUpti_ActivityAPI* activity,
-      ActivityLogger* logger);
-  void handleKernelActivity(
-      const AIUpti_ActivityCompute* activity,
-      ActivityLogger* logger);
-  void handleMemcpyActivity(
-      const AIUpti_ActivityMemcpy* activity,
-      ActivityLogger* logger);
-  void handleMemsetActivity(
-      const AIUpti_ActivityMemset* activity,
-      ActivityLogger* logger);
-  void handleMemoryActivity(
-      const AIUpti_ActivityMemory* activity,
-      ActivityLogger* logger);
+  const ITraceActivity* linkedActivity(int32_t correlationId,
+                                       const std::unordered_map<int64_t, int64_t>& correlationMap);
+  void handleRuntimeActivity(const AIUpti_ActivityAPI* activity, ActivityLogger* logger);
+  void handleKernelActivity(const AIUpti_ActivityCompute* activity, ActivityLogger* logger);
+  void handleMemcpyActivity(const AIUpti_ActivityMemcpy* activity, ActivityLogger* logger);
+  void handleMemsetActivity(const AIUpti_ActivityMemset* activity, ActivityLogger* logger);
+  void handleMemoryActivity(const AIUpti_ActivityMemory* activity, ActivityLogger* logger);
   void handlePtiActivity(const AIUpti_Activity* record, ActivityLogger* logger);
 
   template <class memory_activity_type>
@@ -110,14 +95,12 @@ class AIUActivityProfiler : public libkineto::IActivityProfiler {
 
   const std::string& name() const override;
   const std::set<ActivityType>& availableActivities() const override;
-  std::unique_ptr<libkineto::IActivityProfilerSession> configure(
-      const std::set<ActivityType>& activity_types,
-      const libkineto::Config& config) override;
-  std::unique_ptr<libkineto::IActivityProfilerSession> configure(
-      int64_t ts_ms,
-      int64_t duration_ms,
-      const std::set<ActivityType>& activity_types,
-      const libkineto::Config& config) override;
+  std::unique_ptr<libkineto::IActivityProfilerSession> configure(const std::set<ActivityType>& activity_types,
+                                                                 const libkineto::Config& config) override;
+  std::unique_ptr<libkineto::IActivityProfilerSession> configure(int64_t ts_ms,
+                                                                 int64_t duration_ms,
+                                                                 const std::set<ActivityType>& activity_types,
+                                                                 const libkineto::Config& config) override;
 
  private:
   std::string name_{"__aiu_profiler__"};

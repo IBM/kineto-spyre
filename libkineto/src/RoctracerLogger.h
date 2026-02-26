@@ -94,12 +94,11 @@ typedef enum {
 } roctracer_activity_types;
 
 struct roctracerBase {
-  roctracerBase(
-      uint64_t id,
-      uint32_t domain,
-      uint64_t begin,
-      uint64_t end,
-      roctracer_activity_types type = ROCTRACER_ACTIVITY_NONE)
+  roctracerBase(uint64_t id,
+                uint32_t domain,
+                uint64_t begin,
+                uint64_t end,
+                roctracer_activity_types type = ROCTRACER_ACTIVITY_NONE)
       : id(id), begin(begin), end(end), domain(domain), type(type) {}
   uint64_t id; // correlation_id
   uint64_t begin;
@@ -109,44 +108,39 @@ struct roctracerBase {
 };
 
 struct roctracerRow : public roctracerBase {
-  roctracerRow(
-      uint64_t id,
-      uint32_t domain,
-      uint32_t cid,
-      uint32_t pid,
-      uint32_t tid,
-      uint64_t begin,
-      uint64_t end,
-      roctracer_activity_types type = ROCTRACER_ACTIVITY_DEFAULT)
-      : roctracerBase(id, domain, begin, end, type),
-        cid(cid),
-        pid(pid),
-        tid(tid) {}
+  roctracerRow(uint64_t id,
+               uint32_t domain,
+               uint32_t cid,
+               uint32_t pid,
+               uint32_t tid,
+               uint64_t begin,
+               uint64_t end,
+               roctracer_activity_types type = ROCTRACER_ACTIVITY_DEFAULT)
+      : roctracerBase(id, domain, begin, end, type), cid(cid), pid(pid), tid(tid) {}
   uint32_t cid;
   uint32_t pid;
   uint32_t tid;
 };
 
 struct roctracerKernelRow : public roctracerRow {
-  roctracerKernelRow(
-      uint64_t id,
-      uint32_t domain,
-      uint32_t cid,
-      uint32_t pid,
-      uint32_t tid,
-      uint64_t begin,
-      uint64_t end,
-      const void* faddr,
-      hipFunction_t function,
-      unsigned int gx,
-      unsigned int gy,
-      unsigned int gz,
-      unsigned int wx,
-      unsigned int wy,
-      unsigned int wz,
-      size_t gss,
-      hipStream_t stream,
-      roctracer_activity_types type = ROCTRACER_ACTIVITY_KERNEL)
+  roctracerKernelRow(uint64_t id,
+                     uint32_t domain,
+                     uint32_t cid,
+                     uint32_t pid,
+                     uint32_t tid,
+                     uint64_t begin,
+                     uint64_t end,
+                     const void* faddr,
+                     hipFunction_t function,
+                     unsigned int gx,
+                     unsigned int gy,
+                     unsigned int gz,
+                     unsigned int wx,
+                     unsigned int wy,
+                     unsigned int wz,
+                     size_t gss,
+                     hipStream_t stream,
+                     roctracer_activity_types type = ROCTRACER_ACTIVITY_KERNEL)
       : roctracerRow(id, domain, cid, pid, tid, begin, end, type),
         functionAddr(faddr),
         function(function),
@@ -171,20 +165,19 @@ struct roctracerKernelRow : public roctracerRow {
 };
 
 struct roctracerCopyRow : public roctracerRow {
-  roctracerCopyRow(
-      uint64_t id,
-      uint32_t domain,
-      uint32_t cid,
-      uint32_t pid,
-      uint32_t tid,
-      uint64_t begin,
-      uint64_t end,
-      const void* src,
-      const void* dst,
-      size_t size,
-      hipMemcpyKind kind,
-      hipStream_t stream,
-      roctracer_activity_types type = ROCTRACER_ACTIVITY_COPY)
+  roctracerCopyRow(uint64_t id,
+                   uint32_t domain,
+                   uint32_t cid,
+                   uint32_t pid,
+                   uint32_t tid,
+                   uint64_t begin,
+                   uint64_t end,
+                   const void* src,
+                   const void* dst,
+                   size_t size,
+                   hipMemcpyKind kind,
+                   hipStream_t stream,
+                   roctracer_activity_types type = ROCTRACER_ACTIVITY_COPY)
       : roctracerRow(id, domain, cid, pid, tid, begin, end, type),
         src(src),
         dst(dst),
@@ -199,36 +192,32 @@ struct roctracerCopyRow : public roctracerRow {
 };
 
 struct roctracerMallocRow : public roctracerRow {
-  roctracerMallocRow(
-      uint64_t id,
-      uint32_t domain,
-      uint32_t cid,
-      uint32_t pid,
-      uint32_t tid,
-      uint64_t begin,
-      uint64_t end,
-      const void* ptr,
-      size_t size,
-      roctracer_activity_types type = ROCTRACER_ACTIVITY_MALLOC)
-      : roctracerRow(id, domain, cid, pid, tid, begin, end, type),
-        ptr(ptr),
-        size(size) {}
+  roctracerMallocRow(uint64_t id,
+                     uint32_t domain,
+                     uint32_t cid,
+                     uint32_t pid,
+                     uint32_t tid,
+                     uint64_t begin,
+                     uint64_t end,
+                     const void* ptr,
+                     size_t size,
+                     roctracer_activity_types type = ROCTRACER_ACTIVITY_MALLOC)
+      : roctracerRow(id, domain, cid, pid, tid, begin, end, type), ptr(ptr), size(size) {}
   const void* ptr;
   size_t size;
 };
 
 struct roctracerAsyncRow : public roctracerBase {
-  roctracerAsyncRow(
-      uint64_t id,
-      uint32_t domain,
-      uint32_t kind,
-      uint32_t op,
-      int device,
-      uint64_t queue,
-      uint64_t begin,
-      uint64_t end,
-      const std::string& kernelName,
-      roctracer_activity_types type = ROCTRACER_ACTIVITY_ASYNC)
+  roctracerAsyncRow(uint64_t id,
+                    uint32_t domain,
+                    uint32_t kind,
+                    uint32_t op,
+                    int device,
+                    uint64_t queue,
+                    uint64_t begin,
+                    uint64_t end,
+                    const std::string& kernelName,
+                    roctracer_activity_types type = ROCTRACER_ACTIVITY_ASYNC)
       : roctracerBase(id, domain, begin, end, type),
         kind(kind),
         op(op),
@@ -244,14 +233,7 @@ struct roctracerAsyncRow : public roctracerBase {
 
 class RoctracerLogger {
  public:
-  enum CorrelationDomain {
-    begin,
-    Default = begin,
-    Domain0 = begin,
-    Domain1,
-    end,
-    size = end
-  };
+  enum CorrelationDomain { begin, Default = begin, Domain0 = begin, Domain1, end, size = end };
 
   RoctracerLogger();
   RoctracerLogger(const RoctracerLogger&) = delete;
@@ -275,11 +257,7 @@ class RoctracerLogger {
 
   roctracer_pool_t* hccPool_{NULL};
   static void insert_row_to_buffer(roctracerBase* row);
-  static void api_callback(
-      uint32_t domain,
-      uint32_t cid,
-      const void* callback_data,
-      void* arg);
+  static void api_callback(uint32_t domain, uint32_t cid, const void* callback_data, void* arg);
   static void activity_callback(const char* begin, const char* end, void* arg);
 
   ApiIdList loggedIds_;
@@ -292,8 +270,7 @@ class RoctracerLogger {
   // This vector collects pairs of correlationId and their respective
   // externalCorrelationId for each CorrelationDomain. This will be used
   // to populate the Correlation maps during post processing.
-  std::vector<std::pair<uint64_t, uint64_t>>
-      externalCorrelations_[CorrelationDomain::size];
+  std::vector<std::pair<uint64_t, uint64_t>> externalCorrelations_[CorrelationDomain::size];
   std::mutex externalCorrelationsMutex_;
 
   bool externalCorrelationEnabled_{true};

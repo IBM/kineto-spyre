@@ -51,9 +51,7 @@ class ActivityProfilerProxy : public ActivityProfilerInterface {
   void scheduleTrace(const std::string& configStr) override;
   void scheduleTrace(const Config& config);
 
-  void prepareTrace(
-      const std::set<ActivityType>& activityTypes,
-      const std::string& configStr = "") override;
+  void prepareTrace(const std::set<ActivityType>& activityTypes, const std::string& configStr = "") override;
 
   void toggleCollectionDynamic(const bool enable) override;
 
@@ -71,14 +69,12 @@ class ActivityProfilerProxy : public ActivityProfilerInterface {
 
   void addMetadata(const std::string& key, const std::string& value) override;
 
-  void addChildActivityProfiler(
-      std::unique_ptr<IActivityProfiler> profiler) override;
+  void addChildActivityProfiler(std::unique_ptr<IActivityProfiler> profiler) override;
 
-  void logInvariantViolation(
-      const std::string& profile_id,
-      const std::string& assertion,
-      const std::string& error,
-      const std::string& group_profile_id = "") override;
+  void logInvariantViolation(const std::string& profile_id,
+                             const std::string& assertion,
+                             const std::string& error,
+                             const std::string& group_profile_id = "") override;
 
  private:
   bool cpuOnly_{true};

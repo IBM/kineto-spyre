@@ -30,13 +30,9 @@ constexpr unsigned int kLinkAsyncCpuGpu = 2;
 // @lint-ignore-every CLANGTIDY cppcoreguidelines-pro-type-member-init
 class GenericTraceActivity : public ITraceActivity {
  public:
-  GenericTraceActivity()
-      : activityType(ActivityType::ENUM_COUNT), traceSpan_(nullptr) {}
+  GenericTraceActivity() : activityType(ActivityType::ENUM_COUNT), traceSpan_(nullptr) {}
 
-  GenericTraceActivity(
-      const TraceSpan& trace,
-      ActivityType type,
-      const std::string& name)
+  GenericTraceActivity(const TraceSpan& trace, ActivityType type, const std::string& name)
       : activityType(type), activityName(name), traceSpan_(&trace) {}
 
   int64_t deviceId() const override {

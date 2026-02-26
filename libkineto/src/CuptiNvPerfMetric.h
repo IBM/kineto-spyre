@@ -34,15 +34,14 @@ struct CuptiProfilerResult {
 
 // ok to use fmt::format as error will not occur often. Can't use fmt::print
 // easily since LOG(...) can return void, causes compiler error
-#define NVPW_CALL(call)                                                \
-  [&]() -> bool {                                                      \
-    NVPA_Status _status_ = call;                                       \
-    if (_status_ != NVPA_STATUS_SUCCESS) {                             \
-      LOG(WARNING) << fmt::format(                                     \
-          "function {} failed with error ({})", #call, (int)_status_); \
-      return false;                                                    \
-    }                                                                  \
-    return true;                                                       \
+#define NVPW_CALL(call)                                                                        \
+  [&]() -> bool {                                                                              \
+    NVPA_Status _status_ = call;                                                               \
+    if (_status_ != NVPA_STATUS_SUCCESS) {                                                     \
+      LOG(WARNING) << fmt::format("function {} failed with error ({})", #call, (int)_status_); \
+      return false;                                                                            \
+    }                                                                                          \
+    return true;                                                                               \
   }()
 
 // fixme - add a results string
@@ -51,26 +50,23 @@ struct CuptiProfilerResult {
 namespace nvperf {
 
 // Setup CUPTI profiler configuration blob and counter data image prefix
-bool getProfilerConfigImage(
-    const std::string& chipName,
-    const std::vector<std::string>& metricNames,
-    std::vector<uint8_t>& configImage,
-    const uint8_t* counterAvailabilityImage = nullptr);
+bool getProfilerConfigImage(const std::string& chipName,
+                            const std::vector<std::string>& metricNames,
+                            std::vector<uint8_t>& configImage,
+                            const uint8_t* counterAvailabilityImage = nullptr);
 
 // Setup CUPTI profiler configuration blob and counter data image prefix
-bool getCounterDataPrefixImage(
-    const std::string& chipName,
-    const std::vector<std::string>& metricNames,
-    std::vector<uint8_t>& counterDataImagePrefix);
+bool getCounterDataPrefixImage(const std::string& chipName,
+                               const std::vector<std::string>& metricNames,
+                               std::vector<uint8_t>& counterDataImagePrefix);
 
 /* NV Perf Metric Evaluation helpers
  *   - utilities to read binary data and obtain metrics for ranges
  */
-CuptiProfilerResult evalMetricValues(
-    const std::string& chipName,
-    const std::vector<uint8_t>& counterDataImage,
-    const std::vector<std::string>& metricNames,
-    bool verbose = false);
+CuptiProfilerResult evalMetricValues(const std::string& chipName,
+                                     const std::vector<uint8_t>& counterDataImage,
+                                     const std::vector<std::string>& metricNames,
+                                     bool verbose = false);
 
 } // namespace nvperf
 } // namespace KINETO_NAMESPACE

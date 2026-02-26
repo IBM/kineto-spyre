@@ -48,17 +48,14 @@ class ConfigLoader;
 struct CpuTraceBuffer {
   template <class... Args>
   void emplace_activity(Args&&... args) {
-    activities.emplace_back(
-        std::make_unique<GenericTraceActivity>(std::forward<Args>(args)...));
+    activities.emplace_back(std::make_unique<GenericTraceActivity>(std::forward<Args>(args)...));
   }
 
-  static GenericTraceActivity& toRef(
-      std::unique_ptr<GenericTraceActivity>& ref) {
+  static GenericTraceActivity& toRef(std::unique_ptr<GenericTraceActivity>& ref) {
     return *ref;
   }
 
-  static const GenericTraceActivity& toRef(
-      const std::unique_ptr<GenericTraceActivity>& ref) {
+  static const GenericTraceActivity& toRef(const std::unique_ptr<GenericTraceActivity>& ref) {
     return *ref;
   }
 
@@ -67,13 +64,11 @@ struct CpuTraceBuffer {
   std::deque<std::unique_ptr<GenericTraceActivity>> activities;
 };
 
-using ChildActivityProfilerFactory =
-    std::function<std::unique_ptr<IActivityProfiler>()>;
+using ChildActivityProfilerFactory = std::function<std::unique_ptr<IActivityProfiler>()>;
 
 class LibkinetoApi {
  public:
-  explicit LibkinetoApi(ConfigLoader& configLoader)
-      : configLoader_(configLoader) {}
+  explicit LibkinetoApi(ConfigLoader& configLoader) : configLoader_(configLoader) {}
 
   // Called by client that supports tracing API.
   // libkineto can still function without this.

@@ -45,8 +45,7 @@ bool& use_cupti_tsc();
 // Abstract base class, templated on Cupti activity type
 template <class T>
 struct CuptiActivity : public ITraceActivity {
-  explicit CuptiActivity(const T* activity, const ITraceActivity* linked)
-      : activity_(*activity), linked_(linked) {}
+  explicit CuptiActivity(const T* activity, const ITraceActivity* linked) : activity_(*activity), linked_(linked) {}
   // If we are running on Windows or are on a CUDA version < 11.6,
   // we use the default system clock so no conversion needed same for all
   // ifdefs below
@@ -67,8 +66,7 @@ struct CuptiActivity : public ITraceActivity {
     return activity_.end - activity_.start;
 #else
     if (use_cupti_tsc()) {
-      return get_time_converter()(activity_.end) -
-          get_time_converter()(activity_.start);
+      return get_time_converter()(activity_.end) - get_time_converter()(activity_.start);
     } else {
       return activity_.end - activity_.start;
     }
@@ -104,10 +102,7 @@ struct CuptiActivity : public ITraceActivity {
 
 // CUpti_ActivityAPI - CUDA runtime activities
 struct RuntimeActivity : public CuptiActivity<CUpti_ActivityAPI> {
-  explicit RuntimeActivity(
-      const CUpti_ActivityAPI* activity,
-      const ITraceActivity* linked,
-      int32_t threadId)
+  explicit RuntimeActivity(const CUpti_ActivityAPI* activity, const ITraceActivity* linked, int32_t threadId)
       : CuptiActivity(activity, linked), threadId_(threadId) {}
   int64_t correlationId() const override {
     return activity_.correlationId;
@@ -134,10 +129,7 @@ struct RuntimeActivity : public CuptiActivity<CUpti_ActivityAPI> {
 
 // CUpti_ActivityAPI - CUDA driver activities
 struct DriverActivity : public CuptiActivity<CUpti_ActivityAPI> {
-  explicit DriverActivity(
-      const CUpti_ActivityAPI* activity,
-      const ITraceActivity* linked,
-      int32_t threadId)
+  explicit DriverActivity(const CUpti_ActivityAPI* activity, const ITraceActivity* linked, int32_t threadId)
       : CuptiActivity(activity, linked), threadId_(threadId) {}
   int64_t correlationId() const override {
     return activity_.correlationId;
@@ -162,10 +154,7 @@ struct DriverActivity : public CuptiActivity<CUpti_ActivityAPI> {
 
 // CUpti_ActivityAPI - CUDA runtime activities
 struct OverheadActivity : public CuptiActivity<CUpti_ActivityOverhead> {
-  explicit OverheadActivity(
-      const CUpti_ActivityOverhead* activity,
-      const ITraceActivity* linked,
-      int32_t threadId = 0)
+  explicit OverheadActivity(const CUpti_ActivityOverhead* activity, const ITraceActivity* linked, int32_t threadId = 0)
       : CuptiActivity(activity, linked), threadId_(threadId) {}
 
   int64_t timestamp() const override {
@@ -185,8 +174,7 @@ struct OverheadActivity : public CuptiActivity<CUpti_ActivityOverhead> {
     return activity_.end - activity_.start;
 #else
     if (use_cupti_tsc()) {
-      return get_time_converter()(activity_.end) -
-          get_time_converter()(activity_.start);
+      return get_time_converter()(activity_.end) - get_time_converter()(activity_.start);
     } else {
       return activity_.end - activity_.start;
     }
@@ -216,14 +204,11 @@ struct OverheadActivity : public CuptiActivity<CUpti_ActivityOverhead> {
 
 // CUpti_ActivitySynchronization - CUDA synchronization events
 struct CudaSyncActivity : public CuptiActivity<CUpti_ActivitySynchronization> {
-  explicit CudaSyncActivity(
-      const CUpti_ActivitySynchronization* activity,
-      const ITraceActivity* linked,
-      int32_t srcStream,
-      int32_t srcCorrId)
-      : CuptiActivity(activity, linked),
-        srcStream_(srcStream),
-        srcCorrId_(srcCorrId) {}
+  explicit CudaSyncActivity(const CUpti_ActivitySynchronization* activity,
+                            const ITraceActivity* linked,
+                            int32_t srcStream,
+                            int32_t srcCorrId)
+      : CuptiActivity(activity, linked), srcStream_(srcStream), srcCorrId_(srcCorrId) {}
   int64_t correlationId() const override {
     return raw().correlationId;
   }
@@ -281,9 +266,7 @@ inline int64_t CuptiActivity<CUpti_ActivityCudaEventType>::duration() const {
 
 // CUpti_ActivityCudaEvent - CUDA event activities
 struct CudaEventActivity : public CuptiActivity<CUpti_ActivityCudaEventType> {
-  explicit CudaEventActivity(
-      const CUpti_ActivityCudaEventType* activity,
-      const ITraceActivity* linked)
+  explicit CudaEventActivity(const CUpti_ActivityCudaEventType* activity, const ITraceActivity* linked)
       : CuptiActivity(activity, linked) {}
 
   int64_t correlationId() const override {
@@ -309,8 +292,7 @@ struct CudaEventActivity : public CuptiActivity<CUpti_ActivityCudaEventType> {
 // Can also be instantiated directly.
 template <class T>
 struct GpuActivity : public CuptiActivity<T> {
-  explicit GpuActivity(const T* activity, const ITraceActivity* linked)
-      : CuptiActivity<T>(activity, linked) {}
+  explicit GpuActivity(const T* activity, const ITraceActivity* linked) : CuptiActivity<T>(activity, linked) {}
   int64_t correlationId() const override {
     return raw().correlationId;
   }
@@ -350,15 +332,11 @@ inline bool isWaitEventSync(CUpti_ActivitySynchronizationType type) {
 }
 
 inline bool isEventSync(CUpti_ActivitySynchronizationType type) {
-  return (
-      type == CUPTI_ACTIVITY_SYNCHRONIZATION_TYPE_EVENT_SYNCHRONIZE ||
-      type == CUPTI_ACTIVITY_SYNCHRONIZATION_TYPE_STREAM_WAIT_EVENT);
+  return (type == CUPTI_ACTIVITY_SYNCHRONIZATION_TYPE_EVENT_SYNCHRONIZE ||
+          type == CUPTI_ACTIVITY_SYNCHRONIZATION_TYPE_STREAM_WAIT_EVENT);
 }
 
-inline std::string eventSyncInfo(
-    const CUpti_ActivitySynchronization& act,
-    int32_t srcStream,
-    int32_t srcCorrId) {
+inline std::string eventSyncInfo(const CUpti_ActivitySynchronization& act, int32_t srcStream, int32_t srcCorrId) {
   return fmt::format(
       R"JSON(
       "wait_on_stream": {},
@@ -449,8 +427,7 @@ constexpr int64_t us(int64_t timestamp) {
 }
 
 template <>
-inline const std::string GpuActivity<CUpti_ActivityKernel4>::metadataJson()
-    const {
+inline const std::string GpuActivity<CUpti_ActivityKernel4>::metadataJson() const {
   const CUpti_ActivityKernel4& kernel = raw();
   float blocksPerSmVal = blocksPerSm(kernel);
   float warpsPerSmVal = warpsPerSm(kernel);
@@ -480,11 +457,10 @@ inline const std::string GpuActivity<CUpti_ActivityKernel4>::metadataJson()
 }
 
 inline std::string memcpyName(uint8_t kind, uint8_t src, uint8_t dst) {
-  return fmt::format(
-      "Memcpy {} ({} -> {})",
-      memcpyKindString((CUpti_ActivityMemcpyKind)kind),
-      memoryKindString((CUpti_ActivityMemoryKind)src),
-      memoryKindString((CUpti_ActivityMemoryKind)dst));
+  return fmt::format("Memcpy {} ({} -> {})",
+                     memcpyKindString((CUpti_ActivityMemcpyKind)kind),
+                     memoryKindString((CUpti_ActivityMemoryKind)src),
+                     memoryKindString((CUpti_ActivityMemoryKind)dst));
 }
 
 template <>
@@ -502,8 +478,7 @@ inline std::string bandwidth(uint64_t bytes, uint64_t duration) {
 }
 
 template <>
-inline const std::string GpuActivity<CUpti_ActivityMemcpy>::metadataJson()
-    const {
+inline const std::string GpuActivity<CUpti_ActivityMemcpy>::metadataJson() const {
   const CUpti_ActivityMemcpy& memcpy = raw();
   // clang-format off
   return fmt::format(R"JSON(
@@ -527,8 +502,7 @@ inline const std::string GpuActivity<CUpti_ActivityMemcpy2>::name() const {
 }
 
 template <>
-inline const std::string GpuActivity<CUpti_ActivityMemcpy2>::metadataJson()
-    const {
+inline const std::string GpuActivity<CUpti_ActivityMemcpy2>::metadataJson() const {
   const CUpti_ActivityMemcpy2& memcpy = raw();
   // clang-format off
   return fmt::format(R"JSON(
@@ -545,8 +519,7 @@ inline const std::string GpuActivity<CUpti_ActivityMemcpy2>::metadataJson()
 
 template <>
 inline const std::string GpuActivity<CUpti_ActivityMemset>::name() const {
-  const char* memory_kind =
-      memoryKindString((CUpti_ActivityMemoryKind)raw().memoryKind);
+  const char* memory_kind = memoryKindString((CUpti_ActivityMemoryKind)raw().memoryKind);
   return fmt::format("Memset ({})", memory_kind);
 }
 
@@ -556,8 +529,7 @@ inline ActivityType GpuActivity<CUpti_ActivityMemset>::type() const {
 }
 
 template <>
-inline const std::string GpuActivity<CUpti_ActivityMemset>::metadataJson()
-    const {
+inline const std::string GpuActivity<CUpti_ActivityMemset>::metadataJson() const {
   const CUpti_ActivityMemset& memset = raw();
   // clang-format off
   return fmt::format(R"JSON(
@@ -591,8 +563,7 @@ inline const std::string OverheadActivity::metadataJson() const {
 }
 
 inline bool RuntimeActivity::flowStart() const {
-  return CuptiCbidRegistry::instance().requiresFlowCorrelation(
-      CallbackDomain::RUNTIME, activity_.cbid);
+  return CuptiCbidRegistry::instance().requiresFlowCorrelation(CallbackDomain::RUNTIME, activity_.cbid);
 }
 
 inline const std::string RuntimeActivity::metadataJson() const {
@@ -604,13 +575,11 @@ inline const std::string RuntimeActivity::metadataJson() const {
 }
 
 inline bool isTrackedDriverCbid(const CUpti_ActivityAPI& activity_) {
-  return CuptiCbidRegistry::instance().isRegistered(
-      CallbackDomain::DRIVER, activity_.cbid);
+  return CuptiCbidRegistry::instance().isRegistered(CallbackDomain::DRIVER, activity_.cbid);
 }
 
 inline bool DriverActivity::flowStart() const {
-  return CuptiCbidRegistry::instance().requiresFlowCorrelation(
-      CallbackDomain::DRIVER, activity_.cbid);
+  return CuptiCbidRegistry::instance().requiresFlowCorrelation(CallbackDomain::DRIVER, activity_.cbid);
 }
 
 inline const std::string DriverActivity::metadataJson() const {
@@ -622,8 +591,7 @@ inline const std::string DriverActivity::metadataJson() const {
 }
 
 inline const std::string DriverActivity::name() const {
-  return CuptiCbidRegistry::instance().getName(
-      CallbackDomain::DRIVER, activity_.cbid);
+  return CuptiCbidRegistry::instance().getName(CallbackDomain::DRIVER, activity_.cbid);
 }
 
 template <class T>

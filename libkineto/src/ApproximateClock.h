@@ -43,16 +43,13 @@
 namespace libkineto {
 
 using time_t = int64_t;
-using steady_clock_t = std::conditional_t<
-    std::chrono::high_resolution_clock::is_steady,
-    std::chrono::high_resolution_clock,
-    std::chrono::steady_clock>;
+using steady_clock_t = std::conditional_t<std::chrono::high_resolution_clock::is_steady,
+                                          std::chrono::high_resolution_clock,
+                                          std::chrono::steady_clock>;
 
 inline time_t getTime(bool allow_monotonic = false) {
 #if defined(_WIN32) || defined(__MACH__)
-  return std::chrono::duration_cast<std::chrono::nanoseconds>(
-             steady_clock_t::now().time_since_epoch())
-      .count();
+  return std::chrono::duration_cast<std::chrono::nanoseconds>(steady_clock_t::now().time_since_epoch()).count();
 #else
   // clock_gettime is *much* faster than std::chrono implementation on Linux
   struct timespec t{};
@@ -61,8 +58,7 @@ inline time_t getTime(bool allow_monotonic = false) {
     mode = CLOCK_MONOTONIC;
   }
   clock_gettime(mode, &t);
-  return (static_cast<time_t>(t.tv_sec) * 1000000000) +
-      static_cast<time_t>(t.tv_nsec);
+  return (static_cast<time_t>(t.tv_sec) * 1000000000) + static_cast<time_t>(t.tv_nsec);
 #endif
 }
 
@@ -83,10 +79,8 @@ inline auto getApproximateTime() {
 }
 
 using approx_time_t = decltype(getApproximateTime());
-static_assert(
-    std::is_same_v<approx_time_t, int64_t> ||
-        std::is_same_v<approx_time_t, uint64_t>,
-    "Expected either int64_t (`getTime`) or uint64_t (some TSC reads).");
+static_assert(std::is_same_v<approx_time_t, int64_t> || std::is_same_v<approx_time_t, uint64_t>,
+              "Expected either int64_t (`getTime`) or uint64_t (some TSC reads).");
 
 std::function<time_t(approx_time_t)>& get_time_converter();
 

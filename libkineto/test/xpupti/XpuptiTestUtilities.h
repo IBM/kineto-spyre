@@ -12,10 +12,7 @@ namespace KN = KINETO_NAMESPACE;
 
 bool IsEnvVerbose();
 
-std::pair<
-    std::unique_ptr<KN::IActivityProfilerSession>,
-    std::unique_ptr<KN::CpuTraceBuffer>>
-RunProfilerTest(
+std::pair<std::unique_ptr<KN::IActivityProfilerSession>, std::unique_ptr<KN::CpuTraceBuffer>> RunProfilerTest(
     const std::vector<std::string_view>& metrics,
     const std::set<KN::ActivityType>& activities,
     const KN::Config& cfg,

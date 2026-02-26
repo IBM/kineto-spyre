@@ -28,8 +28,10 @@ namespace KINETO_NAMESPACE {
   throw std::runtime_error(errMsgWithCode);
 }
 
-[[noreturn]] void
-throwXpuRuntimeError(const char* func, int line, pti_result errCode) {
+[[noreturn]] void throwXpuRuntimeError(
+    const char* func,
+    int line,
+    pti_result errCode) {
   auto errMsg = fmt::format(
       "Kineto Profiler on XPU got error from function {} line {}.", func, line);
   throwXpuRuntimeError(errMsg, errCode);

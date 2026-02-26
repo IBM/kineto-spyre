@@ -50,9 +50,7 @@ class ActivityProfilerInterface {
   // Call prepareTrace to enable tracing, then run the region to trace
   // at least once (and ideally run the same code that is to be traced) to
   // allow tracing structures to be initialized.
-  virtual void prepareTrace(
-      const std::set<ActivityType>& activityTypes,
-      const std::string& configStr = "") {}
+  virtual void prepareTrace(const std::set<ActivityType>& activityTypes, const std::string& configStr = "") {}
 
   // Toggle GPU tracing as a trace is running to omit certain parts of a graph
   virtual void toggleCollectionDynamic(const bool enable) {}
@@ -87,22 +85,18 @@ class ActivityProfilerInterface {
 
   // Record trace metadata, currently supporting only string key and values,
   // values with the same key are overwritten
-  virtual void addMetadata(
-      const std::string& key,
-      const std::string& value) = 0;
+  virtual void addMetadata(const std::string& key, const std::string& value) = 0;
 
   // Add a child activity profiler, this enables frameworks in the application
   // to enable custom framework events.
-  virtual void addChildActivityProfiler(
-      std::unique_ptr<IActivityProfiler> profiler) {}
+  virtual void addChildActivityProfiler(std::unique_ptr<IActivityProfiler> profiler) {}
 
   // Log Invariant Violation to factories enabled. This helps record
   // instances when the profiler behaves unexpectedly.
-  virtual void logInvariantViolation(
-      const std::string& /*unused*/,
-      const std::string& /*unused*/,
-      const std::string& /*unused*/,
-      const std::string& /*unused*/ = "") {}
+  virtual void logInvariantViolation(const std::string& /*unused*/,
+                                     const std::string& /*unused*/,
+                                     const std::string& /*unused*/,
+                                     const std::string& /*unused*/ = "") {}
 };
 
 } // namespace libkineto

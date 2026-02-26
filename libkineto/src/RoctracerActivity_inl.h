@@ -50,8 +50,7 @@ inline const char* getGpuActivityKindString(uint32_t kind) {
   return "<unknown>";
 }
 
-inline void
-getMemcpySrcDstString(uint32_t kind, std::string& src, std::string& dst) {
+inline void getMemcpySrcDstString(uint32_t kind, std::string& src, std::string& dst) {
   switch (kind) {
     case HIP_OP_COPY_KIND_DEVICE_TO_HOST_:
     case HIP_OP_COPY_KIND_DEVICE_TO_HOST_2D_:
@@ -80,16 +79,14 @@ getMemcpySrcDstString(uint32_t kind, std::string& src, std::string& dst) {
 inline const std::string GpuActivity::name() const {
   if (type_ == ActivityType::CONCURRENT_KERNEL) {
     const char* name = roctracer_op_string(raw().domain, raw().op, raw().kind);
-    return demangle(
-        raw().kernelName.length() > 0 ? raw().kernelName : std::string(name));
+    return demangle(raw().kernelName.length() > 0 ? raw().kernelName : std::string(name));
   } else if (type_ == ActivityType::GPU_MEMSET) {
     return fmt::format("Memset ({})", getGpuActivityKindString(raw().kind));
   } else if (type_ == ActivityType::GPU_MEMCPY) {
     std::string src = "";
     std::string dst = "";
     getMemcpySrcDstString(raw().kind, src, dst);
-    return fmt::format(
-        "Memcpy {} ({} -> {})", getGpuActivityKindString(raw().kind), src, dst);
+    return fmt::format("Memcpy {} ({} -> {})", getGpuActivityKindString(raw().kind), src, dst);
   } else {
     return "";
   }
@@ -143,16 +140,11 @@ inline const std::string GpuActivity::metadataJson() const {
 
 template <class T>
 inline bool RuntimeActivity<T>::flowStart() const {
-  bool should_correlate = raw().cid == HIP_API_ID_hipLaunchKernel ||
-      raw().cid == HIP_API_ID_hipExtLaunchKernel ||
-      raw().cid == HIP_API_ID_hipLaunchCooperativeKernel ||
-      raw().cid == HIP_API_ID_hipHccModuleLaunchKernel ||
-      raw().cid == HIP_API_ID_hipModuleLaunchKernel ||
-      raw().cid == HIP_API_ID_hipExtModuleLaunchKernel ||
-      raw().cid == HIP_API_ID_hipMalloc || raw().cid == HIP_API_ID_hipFree ||
-      raw().cid == HIP_API_ID_hipMemcpy ||
-      raw().cid == HIP_API_ID_hipMemcpyAsync ||
-      raw().cid == HIP_API_ID_hipMemcpyWithStream;
+  bool should_correlate = raw().cid == HIP_API_ID_hipLaunchKernel || raw().cid == HIP_API_ID_hipExtLaunchKernel ||
+      raw().cid == HIP_API_ID_hipLaunchCooperativeKernel || raw().cid == HIP_API_ID_hipHccModuleLaunchKernel ||
+      raw().cid == HIP_API_ID_hipModuleLaunchKernel || raw().cid == HIP_API_ID_hipExtModuleLaunchKernel ||
+      raw().cid == HIP_API_ID_hipMalloc || raw().cid == HIP_API_ID_hipFree || raw().cid == HIP_API_ID_hipMemcpy ||
+      raw().cid == HIP_API_ID_hipMemcpyAsync || raw().cid == HIP_API_ID_hipMemcpyWithStream;
   return should_correlate;
 }
 
@@ -162,8 +154,7 @@ inline void RuntimeActivity<T>::log(ActivityLogger& logger) const {
 }
 
 template <>
-inline const std::string RuntimeActivity<roctracerKernelRow>::metadataJson()
-    const {
+inline const std::string RuntimeActivity<roctracerKernelRow>::metadataJson() const {
   std::string kernel = "";
   if ((raw().functionAddr != nullptr)) {
     kernel = fmt::format(
@@ -210,8 +201,7 @@ inline const std::string RuntimeActivity<roctracerKernelRow>::metadataJson()
 }
 
 template <>
-inline const std::string RuntimeActivity<roctracerCopyRow>::metadataJson()
-    const {
+inline const std::string RuntimeActivity<roctracerCopyRow>::metadataJson() const {
   correlationToSize[raw().id] = raw().size;
   return fmt::format(
       R"JSON(
@@ -225,8 +215,7 @@ inline const std::string RuntimeActivity<roctracerCopyRow>::metadataJson()
 }
 
 template <>
-inline const std::string RuntimeActivity<roctracerMallocRow>::metadataJson()
-    const {
+inline const std::string RuntimeActivity<roctracerMallocRow>::metadataJson() const {
   correlationToSize[raw().id] = raw().size;
   std::string size = "";
   if (raw().cid == HIP_API_ID_hipMalloc) {

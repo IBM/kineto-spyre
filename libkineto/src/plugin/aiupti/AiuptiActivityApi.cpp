@@ -53,8 +53,10 @@ void AiuptiActivityApi::popCorrelationID(CorrelationFlowType type) {
 #endif
 }
 
-static bool
-nextActivityRecord(uint8_t* buffer, size_t valid_size, Pti_Activity*& record) {
+static bool nextActivityRecord(
+    uint8_t* buffer,
+    size_t valid_size,
+    Pti_Activity*& record) {
 #ifdef HAS_AIUPTI
   AIUpti_ResultTypes status = aiuptiActivityGetNextRecord(buffer, valid_size, &record);
   if (status != AIUpti_ResultTypes::AIUPTI_SUCCESS) {
@@ -93,7 +95,8 @@ void AiuptiActivityApi::bufferRequested(uint8_t **buffer, size_t *size,
   *maxNumRecords = 0;
 }
 
-std::unique_ptr<AiuptiActivityBufferDeque> AiuptiActivityApi::activityBuffers() {
+std::unique_ptr<AiuptiActivityBufferDeque> AiuptiActivityApi::
+    activityBuffers() {
   {
     std::lock_guard<std::mutex> guard(mutex_);
 
