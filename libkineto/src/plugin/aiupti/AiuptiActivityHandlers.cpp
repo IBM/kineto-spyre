@@ -477,29 +477,30 @@ void AiuptiActivityProfilerSession::handleMemoryActivity(
   traceBuffer_.emplace_activity(
     traceBuffer_.span, ActivityType::CPU_INSTANT_EVENT,
     "[memory]");
-    auto &memory_event = traceBuffer_.activities.back();
+  auto &memory_event = traceBuffer_.activities.back();
 
-    memory_event->startTime = activity->start;
+  memory_event->startTime = activity->start;
 
-    // Following convention where all memory events are put on the
-    // CPU thread. "Device Type" will denote CPU vs. AIU memory events
-    // 0 (CPU), 1 (AIU)
-    memory_event->device = systemThreadId();
-    memory_event->resource = systemThreadId();
+  // Following convention where all memory events are put on the
+  // CPU thread. "Device Type" will denote CPU vs. AIU memory events
+  // 0 (CPU), 1 (AIU)
+  memory_event->device = systemThreadId();
+  memory_event->resource = systemThreadId();
 
-    int64_t bytes = static_cast<int64_t>(activity->bytes);
-    if (activity->memory_operation_type == AIUPTI_ACTIVITY_MEMORY_OPERATION_TYPE_RELEASE) {
-      bytes *= -1;
-    }
-    totalAllocatedBytes_ += bytes;
-    memory_event->addMetadata("Total Reserved", 0);
-    memory_event->addMetadata("Total Allocated", totalAllocatedBytes_);
-    memory_event->addMetadata("Bytes", bytes);
-    memory_event->addMetadata("Addr", activity->address);
-    memory_event->addMetadata("Device Id", activity->device_id);
-    memory_event->addMetadata("Device Type", 1);
+  int64_t bytes = static_cast<int64_t>(activity->bytes);
 
-    memory_event->log(*logger);
+  // Negate the bytes since this is a memory release
+  bytes *= -1;
+  
+  totalAllocatedBytes_ += bytes;
+  memory_event->addMetadata("Total Reserved", 0);
+  memory_event->addMetadata("Total Allocated", totalAllocatedBytes_);
+  memory_event->addMetadata("Bytes", bytes);
+  memory_event->addMetadata("Addr", activity->address);
+  memory_event->addMetadata("Device Id", activity->device_id);
+  memory_event->addMetadata("Device Type", 1);
+
+  memory_event->log(*logger);
 }
 
 // inline std::string memcpyName(pti_view_memcpy_type kind,
@@ -604,6 +605,33 @@ void AiuptiActivityProfilerSession::handleMemsetActivity(
   //   return;
   // }
   memset_activity->log(*logger);
+
+  // Create event for AIU memory view
+  traceBuffer_.span.opCount += 1;
+  traceBuffer_.emplace_activity(
+    traceBuffer_.span, ActivityType::CPU_INSTANT_EVENT,
+    "[memory]");
+  auto &memory_event = traceBuffer_.activities.back();
+
+  memory_event->startTime = activity->start;
+
+  // Following convention where all memory events are put on the
+  // CPU thread. "Device Type" will denote CPU vs. AIU memory events
+  // 0 (CPU), 1 (AIU)
+  memory_event->device = systemThreadId();
+  memory_event->resource = systemThreadId();
+
+  int64_t bytes = static_cast<int64_t>(activity->bytes);
+  
+  totalAllocatedBytes_ += bytes;
+  memory_event->addMetadata("Total Reserved", 0);
+  memory_event->addMetadata("Total Allocated", totalAllocatedBytes_);
+  memory_event->addMetadata("Bytes", bytes);
+  memory_event->addMetadata("Addr", activity->address);
+  memory_event->addMetadata("Device Id", activity->device_id);
+  memory_event->addMetadata("Device Type", 1);
+
+  memory_event->log(*logger);
 }
 
 void AiuptiActivityProfilerSession::handlePtiActivity(
