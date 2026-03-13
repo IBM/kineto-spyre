@@ -440,7 +440,10 @@ void AiuptiActivityProfilerSession::handleMemoryActivity(
     mem_activity->endTime = activity->end;
     mem_activity->id = activity->correlation_id;
     mem_activity->device = activity->device_id;
-    mem_activity->resource = getResourceId(activity);
+    // TODO (mcalman): investigate why memory release activities are being processed out of order
+    // This prevents us from using getResourceId which handles overlap
+    // For now, we don't have overlapping memory release activities so this is not an issue
+    mem_activity->resource = getBaseResourceId(activity);
     mem_activity->threadId = activity->stream_id;
     mem_activity->flow.id = 0;
     mem_activity->flow.type = libkineto::kLinkAsyncCpuGpu;
@@ -575,6 +578,7 @@ void AiuptiActivityProfilerSession::handleMemsetActivity(
   memset_activity->device = activity->device_id;
   // TODO (mcalman): investigate why memset activities are being processed out of order
   // This prevents us from using getResourceId which handles overlap
+  // For now, we don't have overlapping memset activities so this is not an issue
   memset_activity->resource = getBaseResourceId(activity);
   memset_activity->threadId = activity->stream_id;
   memset_activity->flow.id = 0;
