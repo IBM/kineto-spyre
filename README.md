@@ -9,6 +9,32 @@ See the [here](docs/devel/README.md) for more details how to install and use it.
 
 The last upstream sync was with the commit `e44f60925593b7cd95e2606e9af2bf14f658dbb3`.
 
+# Installation
+
+Before installing, check your system configuration:
+
+1. Check your PyTorch version:
+   ```bash
+   pip list | grep torch
+   ```
+
+2. Check your Python version:
+   ```bash
+   python --version
+   ```
+
+4. Visit the [releases page](https://github.com/IBM/kineto-spyre/releases) to find the appropriate wheel for your configuration:
+   - **PyTorch version**: e.g., `torch-2.7.1`
+   - **Python version**: indicated by `cp` prefix (e.g., `cp312` requires Python 3.12.x)
+   - **System architecture**: e.g., `x86_64`, `ppc64le`, or `s390x`
+
+5. Install the matching wheel:
+   ```bash
+   pip3 install --no-deps --force-reinstall --user https://github.com/IBM/kineto-spyre/releases/download/torch-2.7.1.aiu.kineto.1.1.1/torch-2.7.1+aiu.kineto.1.1.1-cp312-cp312-linux_x86_64.whl
+   ```
+   
+   **Note:** Replace the URL with the appropriate wheel from the releases page that matches your PyTorch version, Python version, and system architecture.
+
 # Kineto
 
 Kineto is part of the PyTorch Profiler.
