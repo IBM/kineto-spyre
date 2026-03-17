@@ -10,7 +10,7 @@
 
 #include "IpcFabricConfigClient.h"
 
-#include <stdlib.h>
+#include <cstdlib>
 #include <random>
 #include <sstream>
 
@@ -28,7 +28,7 @@ std::string generate_uuid_v4() {
   static std::uniform_int_distribution<> dis2(8, 11);
 
   std::stringstream ss;
-  int i;
+  int i = 0;
   ss << std::hex;
   for (i = 0; i < 8; i++) {
     ss << dis(gen);
@@ -95,7 +95,7 @@ IpcFabricConfigClient::IpcFabricConfigClient()
 
 // Connect to the Dynolog service through Fabric name `dynolog`
 constexpr const char* kDynoIpcName = "dynolog";
-constexpr int maxIpcRetries = 5;
+constexpr int maxIpcRetries = 9;
 constexpr int kSleepUs = 10000;
 
 int32_t IpcFabricConfigClient::registerInstance(int32_t gpu) {
@@ -185,8 +185,8 @@ std::string IpcFabricConfigClient::getLibkinetoOndemandConfig(int32_t type) {
     free(req);
     msg = fabricManager_->poll_recv(maxIpcRetries, kSleepUs);
     if (!msg) {
-      LOG(ERROR) << "Failed to receive ondemand config type=" << type
-                 << " from dyno: IPC recv fail";
+      // LOG(ERROR) << "Failed to receive ondemand config type=" << type
+      //  << " from dyno: IPC recv fail";
       return "";
     }
   } catch (const std::runtime_error& ex) {

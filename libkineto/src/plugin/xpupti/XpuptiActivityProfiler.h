@@ -1,3 +1,11 @@
+/*
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ * All rights reserved.
+ *
+ * This source code is licensed under the BSD-style license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
 #pragma once
 
 #include <mutex>
@@ -23,6 +31,7 @@ class XpuptiActivityProfilerSession
 
   void start() override;
   void stop() override;
+  void toggleCollectionDynamic(const bool);
   std::vector<std::string> errors() override {
     return errors_;
   };
@@ -52,7 +61,11 @@ class XpuptiActivityProfilerSession
   void handleCorrelationActivity(
       const pti_view_record_external_correlation* correlation);
   void handleRuntimeActivity(
+#if PTI_VERSION_MAJOR > 0 || PTI_VERSION_MINOR > 10
+      const pti_view_record_api* activity,
+#else
       const pti_view_record_sycl_runtime* activity,
+#endif
       ActivityLogger* logger);
   void handleKernelActivity(
       const pti_view_record_kernel* activity,

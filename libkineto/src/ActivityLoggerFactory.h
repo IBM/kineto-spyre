@@ -14,6 +14,7 @@
 #include <functional>
 #include <map>
 #include <string>
+#include <utility>
 
 namespace KINETO_NAMESPACE {
 
@@ -26,7 +27,7 @@ class ActivityLoggerFactory {
 
   // Add logger factory for a protocol prefix
   void addProtocol(const std::string& protocol, FactoryFunc f) {
-    factories_[tolower(protocol)] = f;
+    factories_[tolower(protocol)] = std::move(f);
   }
 
   // Create a logger, invoking the factory for the protocol specified in url
@@ -36,8 +37,9 @@ class ActivityLoggerFactory {
     if (it != factories_.end()) {
       return it->second(stripProtocol(url));
     }
-    throw std::invalid_argument(fmt::format(
-        "No logger registered for the {} protocol prefix", protocol));
+    throw std::invalid_argument(
+        fmt::format(
+            "No logger registered for the {} protocol prefix", protocol));
     return nullptr;
   }
 
@@ -49,11 +51,11 @@ class ActivityLoggerFactory {
     return s;
   }
 
-  static std::string extractProtocol(std::string url) {
+  static std::string extractProtocol(const std::string& url) {
     return url.substr(0, url.find("://"));
   }
 
-  static std::string stripProtocol(std::string url) {
+  static std::string stripProtocol(const std::string& url) {
     size_t pos = url.find("://");
     return pos == url.npos ? url : url.substr(pos + 3);
   }

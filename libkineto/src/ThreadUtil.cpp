@@ -13,7 +13,6 @@
 #ifndef _AIX
 #include <sys/syscall.h>
 #endif // _AIX
-#include <sys/types.h>
 #include <unistd.h>
 #else // _WIN32
 #include <codecvt>
@@ -48,6 +47,7 @@ thread_local int32_t _tid = 0;
 thread_local int32_t _sysTid = 0;
 } // namespace
 
+#ifdef __linux__
 int32_t pidNamespace(ino_t& ns) {
   int fd = open("/proc/self/ns/pid", O_RDONLY);
 
@@ -62,6 +62,7 @@ int32_t pidNamespace(ino_t& ns) {
   ns = self_stat.st_ino;
   return 0;
 }
+#endif
 
 int32_t processId(bool cache) {
   int32_t pid = 0;
@@ -127,9 +128,9 @@ void resetTLS() {
 }
 
 namespace {
-static constexpr size_t kMaxThreadNameLength = 16;
+constexpr size_t kMaxThreadNameLength = 16;
 
-static constexpr const char* basename(const char* s, int off = 0) {
+constexpr const char* basename(const char* s, int off = 0) {
   return !s[off]      ? s
       : s[off] == '/' ? basename(&s[off + 1])
                       : basename(s, off + 1);
@@ -171,7 +172,7 @@ std::string getThreadName() {
   return "Unknown";
 #else
 #ifndef _WIN32
-  char buf[kMaxThreadNameLength] = "";
+  char buf[kMaxThreadNameLength];
   if (
 #ifndef __ANDROID__
       pthread_getname_np(pthread_self(), buf, kMaxThreadNameLength) != 0
@@ -233,7 +234,7 @@ static std::pair<int32_t, std::string> parentPidAndCommand(int32_t pid) {
   if (statfile == nullptr) {
     return std::make_pair(0, "");
   }
-  int32_t parent_pid;
+  int32_t parent_pid = 0;
   char* command = nullptr;
   int scanned = fscanf(statfile, "%*d (%m[^)]) %*c %d", &command, &parent_pid);
   fclose(statfile);
@@ -263,7 +264,7 @@ std::vector<std::pair<int32_t, std::string>> pidCommandPairsOfAncestors() {
   for (int i = 0; i <= kMaxParentPids && (i == 0 || curr_pid > 1); i++) {
     std::pair<int32_t, std::string> ppid_and_comm =
         parentPidAndCommand(curr_pid);
-    pairs.push_back(std::make_pair(curr_pid, ppid_and_comm.second));
+    pairs.emplace_back(curr_pid, ppid_and_comm.second);
     curr_pid = ppid_and_comm.first;
   }
   return pairs;

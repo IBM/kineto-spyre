@@ -8,16 +8,19 @@
 
 #include "Config.h"
 
-#include <stdlib.h>
+#include <cstdlib>
 
 #include <fmt/chrono.h>
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 #include <fmt/ranges.h>
-#include <time.h>
+
 #include <chrono>
+#include <ctime>
 #include <functional>
 #include <mutex>
 #include <ostream>
+#include <utility>
 
 #include "Logger.h"
 #include "ThreadUtil.h"
@@ -99,6 +102,9 @@ constexpr char kActivitiesIterationsKey[] = "ACTIVITIES_ITERATIONS";
 constexpr char kProfileMemory[] = "PROFILE_MEMORY";
 constexpr char kProfileMemoryDuration[] = "PROFILE_MEMORY_DURATION_MSECS";
 
+// Roctracer
+constexpr char kRoctracerSetMaxEvents[] = "ROCTRACER_MAX_EVENTS";
+
 // Common
 
 // Client-side timestamp used for synchronized start across hosts for
@@ -165,6 +171,8 @@ constexpr char kLogVerboseLevelKey[] = "VERBOSE_LOG_LEVEL";
 // Example argument: ActivityProfiler.cpp,output_json.cpp
 constexpr char kLogVerboseModulesKey[] = "VERBOSE_LOG_MODULES";
 
+constexpr char kCustomConfigKey[] = "CUSTOM_CONFIG";
+
 // Max devices supported on any system
 constexpr uint8_t kMaxDevices = 8;
 
@@ -175,7 +183,7 @@ struct FactoryMap {
       std::string name,
       std::function<AbstractConfig*(Config&)> factory) {
     std::lock_guard<std::mutex> lock(lock_);
-    factories_[name] = factory;
+    factories_.emplace(std::move(name), std::move(factory));
   }
 
   void addFeatureConfigs(Config& cfg) {
@@ -207,7 +215,7 @@ void Config::addConfigFactory(
     std::function<AbstractConfig*(Config&)> factory) {
   auto factories = configFactories();
   if (factories) {
-    factories->addFactory(name, factory);
+    factories->addFactory(std::move(name), std::move(factory));
   }
 }
 
@@ -291,23 +299,27 @@ const seconds Config::maxRequestAge() const {
 
 static std::string getTimeStr(time_point<system_clock> t) {
   std::time_t t_c = system_clock::to_time_t(t);
-  return fmt::format("{:%H:%M:%S}", fmt::localtime(t_c));
+  std::tm tm{};
+  get_local_time(&t_c, &tm);
+  return fmt::format("{:%H:%M:%S}", tm);
 }
 
 static time_point<system_clock> handleRequestTimestamp(int64_t ms) {
   auto t = time_point<system_clock>(milliseconds(ms));
   auto now = system_clock::now();
   if (t > now) {
-    throw std::invalid_argument(fmt::format(
-        "Invalid {}: {} - time is in future",
-        kRequestTimestampKey,
-        getTimeStr(t)));
+    throw std::invalid_argument(
+        fmt::format(
+            "Invalid {}: {} - time is in future",
+            kRequestTimestampKey,
+            getTimeStr(t)));
   } else if ((now - t) > kMaxRequestAge) {
-    throw std::invalid_argument(fmt::format(
-        "Invalid {}: {} - time is more than {}s in the past",
-        kRequestTimestampKey,
-        getTimeStr(t),
-        kMaxRequestAge.count()));
+    throw std::invalid_argument(
+        fmt::format(
+            "Invalid {}: {} - time is more than {}s in the past",
+            kRequestTimestampKey,
+            getTimeStr(t),
+            kMaxRequestAge.count()));
   }
   return t;
 }
@@ -325,11 +337,12 @@ static time_point<system_clock> handleProfileStartTime(int64_t start_time_ms) {
   // But we can still check that the start time is not in the past.
   auto now = system_clock::now();
   if ((now - t) > kMaxRequestAge) {
-    throw std::invalid_argument(fmt::format(
-        "Invalid {}: {} - start time is more than {}s in the past",
-        kProfileStartTimeKey,
-        getTimeStr(t),
-        kMaxRequestAge.count()));
+    throw std::invalid_argument(
+        fmt::format(
+            "Invalid {}: {} - start time is more than {}s in the past",
+            kProfileStartTimeKey,
+            getTimeStr(t),
+            kMaxRequestAge.count()));
   }
   return t;
 }
@@ -337,9 +350,9 @@ static time_point<system_clock> handleProfileStartTime(int64_t start_time_ms) {
 void Config::setActivityTypes(
     const std::vector<std::string>& selected_activities) {
   selectedActivityTypes_.clear();
-  if (selected_activities.size() > 0) {
+  if (!selected_activities.empty()) {
     for (const auto& activity : selected_activities) {
-      if (activity == "") {
+      if (activity.empty()) {
         continue;
       }
       selectedActivityTypes_.insert(toActivityType(activity));
@@ -356,9 +369,9 @@ bool Config::handleOption(const std::string& name, std::string& val) {
     vector<string> metric_names = splitAndTrim(val, ',');
     metricNames_.insert(metric_names.begin(), metric_names.end());
   } else if (!name.compare(kSamplePeriodKey)) {
-    samplePeriod_ = milliseconds(toInt32(val));
+    samplePeriod_ = milliseconds(toInt64(val));
   } else if (!name.compare(kMultiplexPeriodKey)) {
-    multiplexPeriod_ = milliseconds(toInt32(val));
+    multiplexPeriod_ = milliseconds(toInt64(val));
   } else if (!name.compare(kReportPeriodKey)) {
     setReportPeriod(seconds(toInt32(val)));
   } else if (!name.compare(kSamplesPerReportKey)) {
@@ -431,6 +444,8 @@ bool Config::handleOption(const std::string& name, std::string& val) {
     requestTraceID_ = val;
   } else if (!name.compare(kRequestGroupTraceID)) {
     requestGroupTraceID_ = val;
+  } else if (!name.compare(kRoctracerSetMaxEvents)) {
+    maxEvents_ = toInt32(val);
   }
 
   // TODO: Deprecate Client Interface
@@ -470,6 +485,8 @@ bool Config::handleOption(const std::string& name, std::string& val) {
     enableIpcFabric_ = toBool(val);
   } else if (!name.compare(kOnDemandConfigUpdateIntervalSecsKey)) {
     onDemandConfigUpdateIntervalSecs_ = seconds(toInt32(val));
+  } else if (!name.compare(kCustomConfigKey)) {
+    customConfig_ = val;
   } else {
     return false;
   }
@@ -555,7 +572,7 @@ void Config::validate(
     profileStartIteration_ = 0;
   }
 
-  if (selectedActivityTypes_.size() == 0) {
+  if (selectedActivityTypes_.empty()) {
     selectDefaultActivityTypes();
   }
   setActivityDependentConfig();
@@ -566,36 +583,46 @@ void Config::setReportPeriod(milliseconds msecs) {
 }
 
 void Config::printActivityProfilerConfig(std::ostream& s) const {
-  s << "  Log file: " << activitiesLogFile() << std::endl;
+  fmt::print(s, "  Log file: {}\n", activitiesLogFile());
   if (hasProfileStartIteration()) {
-    s << "  Trace start Iteration: " << profileStartIteration() << std::endl;
-    s << "  Trace warmup Iterations: " << activitiesWarmupIterations()
-      << std::endl;
-    s << "  Trace profile Iterations: " << activitiesRunIterations()
-      << std::endl;
+    fmt::print(
+        s,
+        "  Trace start Iteration: {}\n"
+        "  Trace warmup Iterations: {}\n"
+        "  Trace profile Iterations: {}\n",
+        profileStartIteration(),
+        activitiesWarmupIterations(),
+        activitiesRunIterations());
     if (profileStartIterationRoundUp() > 0) {
-      s << "  Trace start iteration roundup : "
-        << profileStartIterationRoundUp() << std::endl;
+      fmt::print(
+          "  Trace start iteration roundup : {}\n",
+          profileStartIterationRoundUp());
     }
   } else if (hasProfileStartTime()) {
     std::time_t t_c = system_clock::to_time_t(requestTimestamp());
-    s << "  Trace start time: "
-      << fmt::format("{:%Y-%m-%d %H:%M:%S}", fmt::localtime(t_c));
-    s << "  Trace duration: " << activitiesDuration().count() << "ms"
-      << std::endl;
-    s << "  Warmup duration: " << activitiesWarmupDuration().count() << "s"
-      << std::endl;
+    std::tm tm{};
+    get_local_time(&t_c, &tm);
+    fmt::print(
+        s,
+        "  Trace start time: {:%Y-%m-%d %H:%M:%S}\n"
+        "  Trace duration: {}ms\n"
+        "  Warmup duration: {}s\n",
+        tm,
+        activitiesDuration().count(),
+        activitiesWarmupDuration().count());
   }
 
-  s << "  Max GPU buffer size: " << activitiesMaxGpuBufferSize() / 1024 / 1024
-    << "MB" << std::endl;
+  fmt::print(
+      s,
+      "  Max GPU buffer size: {:.0f}MB\n",
+      activitiesMaxGpuBufferSize() / 1024.0 / 1024.0);
 
-  std::vector<const char*> activities;
+  std::vector<std::string> activities;
+  activities.reserve(selectedActivityTypes_.size());
   for (const auto& activity : selectedActivityTypes_) {
-    activities.push_back(toString(activity));
+    activities.emplace_back(toString(activity));
   }
-  s << "  Enabled activities: " << fmt::format("{}", fmt::join(activities, ","))
-    << std::endl;
+  fmt::print(s, "  Enabled activities: {}\n", fmt::join(activities, ","));
 
   AbstractConfig::printActivityProfilerConfig(s);
 }

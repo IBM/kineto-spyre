@@ -15,7 +15,6 @@
 #include <map>
 #include <memory>
 #include <mutex>
-#include <queue>
 #include <string>
 #include <thread>
 #include <unordered_map>
@@ -129,18 +128,21 @@ class CuptiActivityProfiler {
   bool isActive() const {
     return currentRunloopState_ != RunloopState::WaitForRequest;
   }
+  bool isCollectingMemorySnapshot() const {
+    return currentRunloopState_ == RunloopState::CollectMemorySnapshot;
+  }
 
   // Invoke at a regular interval to perform profiling activities.
   // When not active, an interval of 1-5 seconds is probably fine,
   // depending on required warm-up time and delayed start time.
   // When active, it's a good idea to invoke more frequently to stay below
   // memory usage limit (ACTIVITIES_MAX_GPU_BUFFER_SIZE_MB) during warmup.
-  const std::chrono::time_point<std::chrono::system_clock> performRunLoopStep(
+  std::chrono::time_point<std::chrono::system_clock> performRunLoopStep(
       const std::chrono::time_point<std::chrono::system_clock>& now,
       const std::chrono::time_point<std::chrono::system_clock>& nextWakeupTime,
       int64_t currentIter = -1);
 
-  const void performMemoryLoop(
+  void performMemoryLoop(
       const std::string& path,
       uint32_t profile_time,
       ActivityLogger* logger,
@@ -399,7 +401,9 @@ class CuptiActivityProfiler {
   void handleOverheadActivity(
       const CUpti_ActivityOverhead* activity,
       ActivityLogger* logger);
-  void handleCudaEventActivity(const CUpti_ActivityCudaEvent* activity);
+  void handleCudaEventActivity(
+      const CUpti_ActivityCudaEventType* activity,
+      ActivityLogger* logger);
   void handleCudaSyncActivity(
       const CUpti_ActivitySynchronization* activity,
       ActivityLogger* logger);
@@ -464,7 +468,8 @@ class CuptiActivityProfiler {
     WaitForRequest,
     Warmup,
     CollectTrace,
-    ProcessTrace
+    ProcessTrace,
+    CollectMemorySnapshot,
   };
 
   // All recorded trace spans, both CPU and GPU
@@ -490,8 +495,11 @@ class CuptiActivityProfiler {
   profilerOverhead setupOverhead_;
 
   bool cpuOnly_{false};
+  bool gpuOnly_{false};
   bool cpuActivityPresent_{false};
   bool gpuActivityPresent_{false};
+  bool rangeProfilingActive_{false};
+  std::atomic<bool> toggleState_{true};
 
   // ***************************************************************************
   // Below state is shared with external threads.

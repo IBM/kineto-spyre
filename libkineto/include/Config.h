@@ -18,8 +18,6 @@
 #include <string>
 #include <vector>
 
-#include <iostream>
-
 namespace libkineto {
 
 class Config : public AbstractConfig {
@@ -28,6 +26,7 @@ class Config : public AbstractConfig {
   Config& operator=(const Config&) = delete;
   Config(Config&&) = delete;
   Config& operator=(Config&&) = delete;
+  ~Config() override = default;
 
   // Return a full copy including feature config object
   std::unique_ptr<Config> clone() const {
@@ -368,8 +367,9 @@ class Config : public AbstractConfig {
   void printActivityProfilerConfig(std::ostream& s) const override;
   void setActivityDependentConfig() override;
 
-  void validate(const std::chrono::time_point<std::chrono::system_clock>&
-                    fallbackProfileStartTime) override;
+  void validate(
+      const std::chrono::time_point<std::chrono::system_clock>&
+          fallbackProfileStartTime) override;
 
   static void addConfigFactory(
       std::string name,
@@ -389,6 +389,14 @@ class Config : public AbstractConfig {
 
   void setTSCTimestampFlag(bool flag) {
     useTSCTimestamp_ = flag;
+  }
+
+  const std::string& getCustomConfig() const {
+    return customConfig_;
+  }
+
+  uint32_t maxEvents() const {
+    return maxEvents_;
   }
 
  private:
@@ -520,6 +528,13 @@ class Config : public AbstractConfig {
   // Memory Profiler
   bool memoryProfilerEnabled_{false};
   int profileMemoryDuration_{1000};
+
+  // Used to flexibly configure some custom options, especially for custom
+  // backends. How to parse this string is handled by the custom backend.
+  std::string customConfig_;
+
+  // Roctracer settings
+  uint32_t maxEvents_{5000000};
 };
 
 constexpr char kUseDaemonEnvVar[] = "KINETO_USE_DAEMON";

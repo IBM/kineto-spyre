@@ -42,8 +42,12 @@ static bool initialized = false;
 
 static void initProfilers() {
   if (!initialized) {
+    // Caution: `initProfilerIfRegistered` spawns the `updateConfigThread`, so
+    // either:
+    // 1. Ensure nothing the main thread does not do anything which could race
+    // with the `updateConfigThread` (current invariant)
+    // 2. Guard the raceable data appropriately
     libkineto::api().initProfilerIfRegistered();
-    libkineto::api().configLoader().initBaseConfig();
     initialized = true;
     VLOG(0) << "libkineto profilers activated";
   }
@@ -134,7 +138,7 @@ void libkineto_init(bool cpuOnly, bool logOnError) {
   const char* logLevelEnv = getenv("KINETO_LOG_LEVEL");
   if (logLevelEnv) {
     // atoi returns 0 on error, so that's what we want - default to VERBOSE
-    static_assert(static_cast<int>(VERBOSE) == 0, "");
+    static_assert(static_cast<int>(VERBOSE) == 0);
     SET_LOG_SEVERITY_LEVEL(atoi(logLevelEnv));
   }
 
@@ -167,34 +171,9 @@ void libkineto_init(bool cpuOnly, bool logOnError) {
   }
 #endif // HAS_CUPTI
 
-  
   ConfigLoader& config_loader = libkineto::api().configLoader();
   libkineto::api().registerProfiler(
       std::make_unique<ActivityProfilerProxy>(cpuOnly, config_loader));
-
-#ifdef HAS_AIUPTI
-  // register aiu pti profiler
-  libkineto::api().registerProfilerFactory(
-      []() -> std::unique_ptr<IActivityProfiler> {
-        // TODO(mamaral): verify if AIU device is available
-        //         auto returnCode = ptiViewGPULocalAvailable();
-        //         if (returnCode != PTI_SUCCESS) {
-        //           std::string errPrefixMsg(
-        //               "Fail to enable Kineto Profiler on AIU due to error
-        //               code: ");
-        //           errPrefixMsg = errPrefixMsg + std::to_string(returnCode);
-        // #if PTI_VERSION_MAJOR > 0 || PTI_VERSION_MINOR > 9
-        //           std::string errMsg(ptiResultTypeToString(returnCode));
-        //           throw std::runtime_error(
-        //               errPrefixMsg + std::string(". The detailed error
-        //               message is: ") + errMsg);
-        // #else
-        //           throw std::runtime_error(errPrefixMsg);
-        // #endif
-        //         }
-        return std::make_unique<AIUActivityProfiler>();
-      });
-#endif // HAS_AIUPTI
 
 #ifdef HAS_XPUPTI
   // register xpu pti profiler
@@ -217,6 +196,14 @@ void libkineto_init(bool cpuOnly, bool logOnError) {
         return std::make_unique<XPUActivityProfiler>();
       });
 #endif // HAS_XPUPTI
+
+#ifdef HAS_AIUPTI
+  // register aiu pti profiler
+  libkineto::api().registerProfilerFactory(
+      []() -> std::unique_ptr<IActivityProfiler> {
+        return std::make_unique<AIUActivityProfiler>();
+      });
+#endif // HAS_AIUPTI
 
 #if __linux__
   // For open source users that would like to connect to a profiling daemon

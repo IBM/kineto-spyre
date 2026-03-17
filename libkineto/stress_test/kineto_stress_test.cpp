@@ -18,6 +18,8 @@
 #include <libkineto.h>
 #include <unistd.h>
 
+#include <folly/init/Init.h>
+
 #include <ApproximateClock.h>
 #include <c10/util/ApproximateClock.h>
 #include "kineto/libkineto/stress_test/stress_test_input.h"
@@ -30,8 +32,6 @@ void trace_collection_thread(
     uint32_t trace_delay_us,
     uint32_t trace_length_us,
     uint32_t cupti_buffer_mb) {
-  c10::ApproximateClockToUnixTimeConverter clockConverter;
-
   if (cupti_buffer_mb > 0) {
     // Configure CUPTI buffer sizes
     size_t attrValue = 0, attrValueSize = sizeof(size_t);
@@ -52,8 +52,6 @@ void trace_collection_thread(
   auto& profiler = libkineto::api().activityProfiler();
   libkineto::api().initProfilerIfRegistered();
   profiler.prepareTrace(types);
-  auto converter = clockConverter.makeConverter();
-  libkineto::get_time_converter() = converter;
 
   // Wait a bit before collecting the trace
   usleep(trace_delay_us);
@@ -241,6 +239,8 @@ int main(int argc, char* argv[]) {
 
   int rank = 0;
   int num_ranks = 0;
+
+  folly::init(&argc, &argv);
 
   MPICHECK(MPI_Init(&argc, &argv));
   MPICHECK(MPI_Comm_rank(MPI_COMM_WORLD, &rank));

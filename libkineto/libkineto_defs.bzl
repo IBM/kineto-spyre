@@ -22,6 +22,7 @@ def get_libkineto_cupti_srcs(with_api = True):
         "src/Demangle.cpp",
         "src/EventProfiler.cpp",
         "src/EventProfilerController.cpp",
+        "src/KernelRegistry.cpp",
         "src/WeakSymbols.cpp",
         "src/cupti_strings.cpp",
     ] + (get_libkineto_cpu_only_srcs(with_api))
@@ -49,6 +50,7 @@ def get_libkineto_aiupti_srcs(with_api = True):
 def get_libkineto_cpu_only_srcs(with_api = True):
     return [
         "src/AbstractConfig.cpp",
+        "src/ApproximateClock.cpp",
         "src/CuptiActivityProfiler.cpp",
         "src/ActivityProfilerController.cpp",
         "src/ActivityProfilerProxy.cpp",

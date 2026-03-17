@@ -19,8 +19,6 @@
 #include "ThreadUtil.h"
 #include "TraceSpan.h"
 
-#include <iostream>
-
 namespace libkineto {
 
 // Link type, used in GenericTraceActivity.flow.type
@@ -123,6 +121,7 @@ class GenericTraceActivity : public ITraceActivity {
       if (!first) {
         json << ", ";
       }
+      // Ok to use fmt::format here as we are not logging
       val.second ? json << fmt::format("\"{}\": \"{}\"", key, val.first)
                  : json << fmt::format("\"{}\": {}", key, val.first);
       first = false;

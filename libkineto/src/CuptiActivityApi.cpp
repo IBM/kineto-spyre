@@ -202,6 +202,15 @@ std::unique_ptr<CuptiActivityBufferMap> CuptiActivityApi::activityBuffers() {
     flushOverhead =
         duration_cast<microseconds>(system_clock::now() - t1).count();
   }
+
+#if (CUDART_VERSION >= 12030)
+  // Clear out per-thread buffer flag in case it was set
+  uint8_t value = 0;
+  size_t sizeof_value = sizeof(value);
+
+  CUPTI_CALL(cuptiActivitySetAttribute(
+      CUPTI_ACTIVITY_ATTR_PER_THREAD_ACTIVITY_BUFFER, &sizeof_value, &value));
+#endif // (CUDART_VERSION >= 12030)
 #endif
   std::lock_guard<std::mutex> guard(mutex_);
   // Transfer ownership of buffers to caller. A new map is created on-demand.
@@ -238,6 +247,12 @@ const std::pair<int, size_t> CuptiActivityApi::processActivities(
   }
 #endif
   return res;
+}
+
+void CuptiActivityApi::flushActivities() {
+#ifdef HAS_CUPTI
+  CUPTI_CALL(cuptiActivityFlushAll(0));
+#endif
 }
 
 void CuptiActivityApi::clearActivities() {
@@ -350,6 +365,9 @@ void CuptiActivityApi::enableCuptiActivities(
       externalCorrelationEnabled_ = true;
     }
     if (activity == ActivityType::CUDA_SYNC) {
+#if CUDA_VERSION >= 13000
+      CUPTI_CALL(cuptiActivityEnableCudaEventDeviceTimestamps(true));
+#endif
       CUPTI_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_SYNCHRONIZATION));
     }
     if (activity == ActivityType::CUDA_RUNTIME) {
@@ -413,14 +431,6 @@ void CuptiActivityApi::disableCuptiActivities(
     }
   }
   externalCorrelationEnabled_ = false;
-  // Clear out per-thread buffer flag in case it was set
-#if (CUDART_VERSION >= 12030)
-  uint8_t value = 0;
-  size_t sizeof_value = sizeof(value);
-
-  CUPTI_CALL(cuptiActivitySetAttribute(
-      CUPTI_ACTIVITY_ATTR_PER_THREAD_ACTIVITY_BUFFER, &sizeof_value, &value));
-#endif // (CUDART_VERSION >= 12030)
 #endif // HAS_CUPTI
 }
 

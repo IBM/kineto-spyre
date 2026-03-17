@@ -11,9 +11,8 @@ void AiuptiActivityProfilerSession::removeCorrelatedPtiActivities(
     const ITraceActivity* act1) {
   const auto key = act1->correlationId();
   const auto& it = correlatedPtiActivities_.find(key);
-  if (it != correlatedPtiActivities_.end()) {
+  if (it != correlatedPtiActivities_.end())
     correlatedPtiActivities_.erase(key);
-  }
   return;
 }
 
@@ -60,9 +59,8 @@ const ITraceActivity* AiuptiActivityProfilerSession::linkedActivity(
     int32_t correlationId,
     const std::unordered_map<int64_t, int64_t>& correlationMap) {
   const auto& it = correlationMap.find(correlationId);
-  if (it != correlationMap.end()) {
+  if (it != correlationMap.end())
     return cpuActivity_(it->second);
-  }
   return nullptr;
 }
 
@@ -183,7 +181,8 @@ inline std::string runtimeCbidName(AIUpti_runtime_api_trace_cbid cbid) {
 }
 
 void AiuptiActivityProfilerSession::handleRuntimeActivity(
-    const AIUpti_ActivityAPI *activity, ActivityLogger *logger) {
+    const AIUpti_ActivityAPI* activity,
+    ActivityLogger* logger) {
   traceBuffer_.span.opCount += 1;
   traceBuffer_.gpuOpCount += 1;
   cpuCorrelationMap_[activity->correlation_id] = 0; // fake add correlation
@@ -288,7 +287,7 @@ void AiuptiActivityProfilerSession::handleKernelActivity(
 }
 
 template <class memory_activity_type>
-inline std::string bandwidth(memory_activity_type *activity) {
+inline std::string bandwidth(memory_activity_type* activity) {
   auto duration = activity->end - activity->start;
   auto bytes = activity->bytes;
   return duration == 0 ? "\"N/A\"" : fmt::format("{}", bytes * 1.0 / duration);
@@ -296,35 +295,37 @@ inline std::string bandwidth(memory_activity_type *activity) {
 
 inline std::string memoryCopyOperationName(uint8_t kind) {
   switch (kind) {
-  case (uint8_t)AIUPTI_ACTIVITY_MEMCPY_KIND_HTOD:
-    return "HtoD";
-  case (uint8_t)AIUPTI_ACTIVITY_MEMCPY_KIND_DTOH:
-    return "DtoH";
-  case (uint8_t)AIUPTI_ACTIVITY_MEMCPY_KIND_PTOP:
-    return "PtoP";
-  default:
-    break;
+    case (uint8_t)AIUPTI_ACTIVITY_MEMCPY_KIND_HTOD:
+      return "HtoD";
+    case (uint8_t)AIUPTI_ACTIVITY_MEMCPY_KIND_DTOH:
+      return "DtoH";
+    case (uint8_t)AIUPTI_ACTIVITY_MEMCPY_KIND_PTOP:
+      return "PtoP";
+    default:
+      break;
   }
   return "<unknown>";
 }
 
-inline uint32_t getBaseResourceId(const AIUpti_ActivityMemcpy *activity) {
+inline uint32_t getBaseResourceId(const AIUpti_ActivityMemcpy* activity) {
   return activity->copy_kind * 100;
 }
 
-inline uint32_t getBaseResourceId(const AIUpti_ActivityMemory *activity) {
+inline uint32_t getBaseResourceId(const AIUpti_ActivityMemory* activity) {
   return 400;
 }
 
-inline uint32_t getBaseResourceId(const AIUpti_ActivityMemset *activity) {
+inline uint32_t getBaseResourceId(const AIUpti_ActivityMemset* activity) {
   return 400; // put memset and memory release on the same PID
 }
 
 template <class memory_activity_type>
-uint32_t AiuptiActivityProfilerSession::getResourceId(memory_activity_type *activity) {
+uint32_t AiuptiActivityProfilerSession::getResourceId(
+    memory_activity_type* activity) {
   uint32_t overlap_offset = 0;
   uint32_t base_resource_id = getBaseResourceId(activity);
-  const auto it = activeThreadMap_.find({activity->device_id, base_resource_id});
+  const auto it =
+      activeThreadMap_.find({activity->device_id, base_resource_id});
   if (it != activeThreadMap_.end()) {
     std::vector<int64_t>& last_active_times = (*it).second;
     bool found_useable_thread = false;
@@ -340,30 +341,34 @@ uint32_t AiuptiActivityProfilerSession::getResourceId(memory_activity_type *acti
       last_active_times.push_back(activity->end);
       overlap_offset = last_active_times.size() - 1;
     }
-    activeThreadMap_[{activity->device_id, base_resource_id}][overlap_offset] = activity->end;
+    activeThreadMap_[{activity->device_id, base_resource_id}][overlap_offset] =
+        activity->end;
   } else {
     activeThreadMap_[{activity->device_id, base_resource_id}] = {activity->end};
   }
   return base_resource_id + overlap_offset;
 }
 
-template uint32_t AiuptiActivityProfilerSession::getResourceId<AIUpti_ActivityMemcpy>(AIUpti_ActivityMemcpy *activity);
-template uint32_t AiuptiActivityProfilerSession::getResourceId<AIUpti_ActivityMemory>(AIUpti_ActivityMemory *activity);
-template uint32_t AiuptiActivityProfilerSession::getResourceId<AIUpti_ActivityMemset>(AIUpti_ActivityMemset *activity);
+template uint32_t AiuptiActivityProfilerSession::getResourceId<
+    AIUpti_ActivityMemcpy>(AIUpti_ActivityMemcpy* activity);
+template uint32_t AiuptiActivityProfilerSession::getResourceId<
+    AIUpti_ActivityMemory>(AIUpti_ActivityMemory* activity);
+template uint32_t AiuptiActivityProfilerSession::getResourceId<
+    AIUpti_ActivityMemset>(AIUpti_ActivityMemset* activity);
 
 void AiuptiActivityProfilerSession::handleMemcpyActivity(
-    const AIUpti_ActivityMemcpy *activity, ActivityLogger *logger) {
+    const AIUpti_ActivityMemcpy* activity,
+    ActivityLogger* logger) {
   traceBuffer_.span.opCount += 1;
   traceBuffer_.gpuOpCount += 1;
   cpuCorrelationMap_[activity->correlation_id] = 0; // fake add correlation
   const ITraceActivity* linked =
       linkedActivity(activity->correlation_id, cpuCorrelationMap_);
   traceBuffer_.emplace_activity(
-      traceBuffer_.span, ActivityType::GPU_MEMCPY,
+      traceBuffer_.span,
+      ActivityType::GPU_MEMCPY,
       fmt::format("Memcpy ({})", memoryCopyOperationName(activity->copy_kind)));
-  // memcpyName(
-  //     activity->memcpy_type, activity->mem_src, activity->mem_dst));
-  auto &memcpy_activity = traceBuffer_.activities.back();
+  auto& memcpy_activity = traceBuffer_.activities.back();
   memcpy_activity->startTime = activity->start;
   memcpy_activity->endTime = activity->end;
   memcpy_activity->id = activity->correlation_id;
@@ -384,7 +389,11 @@ void AiuptiActivityProfilerSession::handleMemcpyActivity(
   memcpy_activity->addMetadata("memory bandwidth (GB/s)", bandwidth(activity));
 
   if (memcpy_activity->resource == getBaseResourceId(activity)) {
-    recordMemoryStream(memcpy_activity->device, memcpy_activity->resource, fmt::format("Memcpy ({}):", memoryCopyOperationName(activity->copy_kind)));
+    recordMemoryStream(
+        memcpy_activity->device,
+        memcpy_activity->resource,
+        fmt::format(
+            "Memcpy ({}):", memoryCopyOperationName(activity->copy_kind)));
   } else {
     recordMemoryStream(memcpy_activity->device, memcpy_activity->resource, " ");
   }
@@ -402,12 +411,12 @@ void AiuptiActivityProfilerSession::handleMemcpyActivity(
 
 inline std::string memoryOperationName(uint8_t kind) {
   switch (kind) {
-  case (uint8_t)AIUPTI_ACTIVITY_MEMORY_OPERATION_TYPE_ALLOCATION:
-    return "Allocation";
-  case (uint8_t)AIUPTI_ACTIVITY_MEMORY_OPERATION_TYPE_RELEASE:
-    return "Release";
-  default:
-    break;
+    case (uint8_t)AIUPTI_ACTIVITY_MEMORY_OPERATION_TYPE_ALLOCATION:
+      return "Allocation";
+    case (uint8_t)AIUPTI_ACTIVITY_MEMORY_OPERATION_TYPE_RELEASE:
+      return "Release";
+    default:
+      break;
   }
   return "<unknown>";
 }
@@ -557,11 +566,7 @@ void AiuptiActivityProfilerSession::handleMemsetActivity(
   const ITraceActivity* linked =
       linkedActivity(activity->correlation_id, cpuCorrelationMap_);
   traceBuffer_.emplace_activity(
-      traceBuffer_.span,
-      ActivityType::GPU_MEMSET,
-          "Memset (Device)");
-      // fmt::format(
-      //     "Memset (Device)", ptiViewMemoryTypeToString(activity->mem_type)));
+      traceBuffer_.span, ActivityType::GPU_MEMSET, "Memset (Device)");
   auto& memset_activity = traceBuffer_.activities.back();
   memset_activity->startTime = activity->start;
   memset_activity->endTime = activity->end;
@@ -577,8 +582,8 @@ void AiuptiActivityProfilerSession::handleMemsetActivity(
   memset_activity->linked = linked;
   memset_activity->addMetadataQuoted("call", "Memset");
   memset_activity->addMetadata("device", memset_activity->deviceId());
-  memset_activity->addMetadataQuoted("context",
-                                     std::to_string(activity->context_id));
+  memset_activity->addMetadataQuoted(
+      "context", std::to_string(activity->context_id));
   memset_activity->addMetadata("correlation", activity->correlation_id);
   memset_activity->addMetadata("bytes", activity->bytes);
   memset_activity->addMetadata("memory bandwidth (GB/s)", bandwidth(activity));
@@ -601,72 +606,35 @@ void AiuptiActivityProfilerSession::handleMemsetActivity(
   memset_activity->log(*logger);
 }
 
-// void AiuptiActivityProfilerSession::handleOverheadActivity(
-//     const pti_view_record_overhead* activity,
-//     ActivityLogger* logger) {
-//   traceBuffer_.emplace_activity(
-//       traceBuffer_.span,
-//       ActivityType::OVERHEAD,
-//       ptiViewOverheadKindToString(activity->overhead_kind));
-//   auto& overhead_activity = traceBuffer_.activities.back();
-//   overhead_activity->startTime = activity->overhead_start_timestamp_ns;
-//   overhead_activity->endTime = activity->overhead_end_timestamp_ns;
-//   overhead_activity->device = -1;
-//   overhead_activity->resource = activity->overhead_thread_id;
-//   overhead_activity->threadId = activity->overhead_thread_id;
-//   overhead_activity->addMetadata(
-//       "overhead cost", activity->overhead_duration_ns);
-//   overhead_activity->addMetadataQuoted(
-//       "overhead occupancy",
-//       fmt::format(
-//           "{}\%",
-//           activity->overhead_duration_ns / overhead_activity->duration()));
-//   overhead_activity->addMetadata("overhead count", activity->overhead_count);
-
-//   if (outOfRange(*overhead_activity)) {
-//     return;
-//   }
-  // overhead_activity->log(*logger);
-// }
-
 void AiuptiActivityProfilerSession::handlePtiActivity(
-    const AIUpti_Activity *record, ActivityLogger *logger) {
+    const AIUpti_Activity* record,
+    ActivityLogger* logger) {
   switch (record->kind) {
-  // case AIUPTI_ACTIVITY_EXTERNAL_CORRELATION:
-  //   handleCorrelationActivity(
-  //       reinterpret_cast<const AIUpti_ActivityExternalCorrelation
-  //       *>(record));
-  //   break;
-  case (uint8_t)AIUPTI_ACTIVITY_KIND_RUNTIME:
-    handleRuntimeActivity(reinterpret_cast<const AIUpti_ActivityAPI *>(record),
-                          logger);
-    break;
-  case (uint8_t)AIUPTI_ACTIVITY_KIND_CMPT:
-    handleKernelActivity(
-        reinterpret_cast<const AIUpti_ActivityCompute *>(record), logger);
-    break;
-  case (uint8_t)AIUPTI_ACTIVITY_KIND_MEMCPY:
-    handleMemcpyActivity(
-        reinterpret_cast<const AIUpti_ActivityMemcpy *>(record), logger);
-    break;
-  case (uint8_t)AIUPTI_ACTIVITY_KIND_MEMSET:
-    handleMemsetActivity(
-        reinterpret_cast<const AIUpti_ActivityMemset *>(record), logger);
-    break;
-  case (uint8_t)AIUPTI_ACTIVITY_KIND_MEMORY:
-    handleMemoryActivity(
-        reinterpret_cast<const AIUpti_ActivityMemory *>(record), logger);
-    break;
-  // case PTI_VIEW_COLLECTION_OVERHEAD:
-  //   handleOverheadActivity(
-  //       reinterpret_cast<const AIUpti_ActivityOverhead *>(record), logger);
-  //   break;
-  default:
-    errors_.push_back("Unexpected activity type: " +
-                      std::to_string(record->kind));
-    break;
+    case (uint8_t)AIUPTI_ACTIVITY_KIND_RUNTIME:
+      handleRuntimeActivity(
+          reinterpret_cast<const AIUpti_ActivityAPI*>(record), logger);
+      break;
+    case (uint8_t)AIUPTI_ACTIVITY_KIND_CMPT:
+      handleKernelActivity(
+          reinterpret_cast<const AIUpti_ActivityCompute*>(record), logger);
+      break;
+    case (uint8_t)AIUPTI_ACTIVITY_KIND_MEMCPY:
+      handleMemcpyActivity(
+          reinterpret_cast<const AIUpti_ActivityMemcpy*>(record), logger);
+      break;
+    case (uint8_t)AIUPTI_ACTIVITY_KIND_MEMSET:
+      handleMemsetActivity(
+          reinterpret_cast<const AIUpti_ActivityMemset*>(record), logger);
+      break;
+    case (uint8_t)AIUPTI_ACTIVITY_KIND_MEMORY:
+      handleMemoryActivity(
+          reinterpret_cast<const AIUpti_ActivityMemory*>(record), logger);
+      break;
+    default:
+      errors_.push_back(
+          "Unexpected activity type: " + std::to_string(record->kind));
+      break;
   }
 }
 
 } // namespace KINETO_NAMESPACE
-

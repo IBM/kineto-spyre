@@ -85,6 +85,11 @@ class HeartbeatMonitor {
     stopMonitoring();
   }
 
+  HeartbeatMonitor(const HeartbeatMonitor&) = delete;
+  HeartbeatMonitor& operator=(const HeartbeatMonitor&) = delete;
+  HeartbeatMonitor(HeartbeatMonitor&&) = delete;
+  HeartbeatMonitor& operator=(HeartbeatMonitor&&) = delete;
+
   static HeartbeatMonitor& instance() {
     static HeartbeatMonitor monitor;
     return monitor;
@@ -382,8 +387,9 @@ void EventProfilerController::profilerLoop() {
     }
     int sleep_time = duration_cast<milliseconds>(now - start_sleep).count();
 
-    if (stopRunloop_)
+    if (stopRunloop_) {
       break;
+    }
 
     auto start_sample = now;
     profiler_->collectSample();

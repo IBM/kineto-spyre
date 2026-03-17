@@ -13,14 +13,15 @@
 
 #ifndef USE_GOOGLE_LOG
 
-#include <time.h>
 #include <chrono>
 #include <cstring>
+#include <ctime>
 #include <iomanip>
 #include <iostream>
 
 #include <fmt/chrono.h>
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 
 #include "ThreadUtil.h"
 
@@ -30,19 +31,33 @@ std::atomic_int Logger::severityLevel_{VERBOSE};
 std::atomic_int Logger::verboseLogLevel_{-1};
 std::atomic<uint64_t> Logger::verboseLogModules_{~0ull};
 
+void get_local_time(const time_t* time, struct tm* tm_result) {
+#ifdef _WIN32
+  // Windows-specific code
+  localtime_s(tm_result, time);
+#else
+  // Linux-specific code
+  localtime_r(time, tm_result);
+#endif
+}
+
 Logger::Logger(int severity, int line, const char* filePath, int errnum)
-    : buf_(),
-      out_(LIBKINETO_DBG_STREAM),
-      errnum_(errnum),
-      messageSeverity_(severity) {
+    : out_(LIBKINETO_DBG_STREAM), errnum_(errnum), messageSeverity_(severity) {
   buf_ << toString((LoggerOutputType)severity) << ":";
 
   const auto tt =
       std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
-  const char* file = strrchr(filePath, '/');
-  buf_ << fmt::format("{:%Y-%m-%d %H:%M:%S}", fmt::localtime(tt)) << " "
-       << processId(false) << ":" << systemThreadId(false) << " "
-       << (file ? file + 1 : filePath) << ":" << line << "] ";
+  std::tm tm_result;
+  get_local_time(&tt, &tm_result);
+  const char* file = std::strrchr(filePath, '/');
+  fmt::print(
+      buf_,
+      "{:%Y-%m-%d %H:%M:%S} {}:{} {}:{}] ",
+      tm_result,
+      processId(false),
+      systemThreadId(false),
+      (file ? file + 1 : filePath),
+      line);
 }
 
 Logger::~Logger() {

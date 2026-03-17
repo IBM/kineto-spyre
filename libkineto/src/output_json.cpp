@@ -9,11 +9,13 @@
 #include "output_json.h"
 
 #include <fmt/format.h>
-#include <time.h>
+#include <fmt/ostream.h>
+#include <algorithm>
+#include <ctime>
 #include <fstream>
+#include <iterator>
 #include "Config.h"
 #include "TraceSpan.h"
-
 
 #include "Logger.h"
 
@@ -78,11 +80,21 @@ void ChromeTraceLogger::sanitizeStrForJSON(std::string& value) {
   value.erase(std::remove(value.begin(), value.end(), '\n'), value.end());
 }
 
+static std::string string2hex(const std::string& str) {
+  std::string out;
+  out.reserve(str.size() * 2);
+  for (uint8_t c : str) {
+    // “:02x” -> two‐digit, zero‐padded, lowercase hex
+    fmt::format_to(std::back_inserter(out), "{:02x}", c);
+  }
+  return out;
+}
+
 static void sanitizeForNonReadableChars(std::string& value) {
   for (auto& c : value) {
     if (!std::isprint(c)) {
-      LOG(WARNING) << "Non JSON compliant character found in string: " << value
-                   << " Replacing with 'unknown'";
+      LOG(WARNING) << "Non JSON compliant character found in string: 0x"
+                   << string2hex(value) << " Replacing with 'unknown'";
       value = "unknown";
       break;
     }
@@ -100,7 +112,7 @@ static inline int32_t sanitizeTid(int32_t tid) {
 
 void ChromeTraceLogger::metadataToJSON(
     const std::unordered_map<std::string, std::string>& metadata) {
-  for (auto [k, v] : metadata) {
+  for (const auto& [k, v] : metadata) {
     std::string sanitizedValue = v;
     // There is a seperate mechanism for recording distributedInfo in on-demand
     // so add a guard to prevent "double counting" in auto-trace.
@@ -108,9 +120,10 @@ void ChromeTraceLogger::metadataToJSON(
       distInfo_.distInfo_present_ = true;
     }
     sanitizeStrForJSON(sanitizedValue);
-    traceOf_ << fmt::format(
+    fmt::print(
+        traceOf_,
         R"JSON(
-  "{}": {},)JSON",
+      "{}": {},)JSON",
         k,
         sanitizedValue);
   }
@@ -126,29 +139,28 @@ void ChromeTraceLogger::handleTraceStart(
 #ifdef DISPLAY_TRACE_IN_NS
   display_unit = "ns";
 #endif
-  traceOf_ << fmt::format(
+  fmt::print(
+      traceOf_,
       R"JSON(
-{{
-  "schemaVersion": {},)JSON",
+  {{
+    "schemaVersion": {},)JSON",
       kSchemaVersion);
-
-  traceOf_ << fmt::format(
+  fmt::print(
+      traceOf_,
       R"JSON(
-  "deviceProperties": [{}
-  ],)JSON",
+    "deviceProperties": [{}
+    ],)JSON",
       device_properties);
 
   metadataToJSON(metadata);
-
-  traceOf_ << fmt::format(
+  fmt::print(
+      traceOf_,
       R"JSON(
   "displayTimeUnit": "{}",
-  "baseTimeNanoseconds": {},)JSON",
+  "baseTimeNanoseconds": {},
+  "traceEvents": [)JSON",
       display_unit,
       ChromeTraceBaseTime::singleton().get());
-
-  traceOf_ << R"JSON(
-  "traceEvents": [)JSON";
 }
 
 static std::string defaultFileName() {
@@ -186,7 +198,7 @@ void ChromeTraceLogger::handleDeviceInfo(
   // process_name needs a pid and a name arg
   // clang-format off
   time = transToRelativeTime(time);
-  traceOf_ << fmt::format(R"JSON(
+  fmt::print(traceOf_, R"JSON(
   {{
     "name": "process_name", "ph": "M", "ts": {}.{:03}, "pid": {}, "tid": 0,
     "args": {{
@@ -225,7 +237,7 @@ void ChromeTraceLogger::handleResourceInfo(
   // thread_name needs a pid and a name arg
   // clang-format off
   time = transToRelativeTime(time);
-  traceOf_ << fmt::format(R"JSON(
+  fmt::print(traceOf_, R"JSON(
   {{
     "name": "thread_name", "ph": "M", "ts": {}.{:03}, "pid": {}, "tid": {},
     "args": {{
@@ -256,7 +268,7 @@ void ChromeTraceLogger::handleOverheadInfo(
   // this for other metadata
   // clang-format off
   time = transToRelativeTime(time);
-  traceOf_ << fmt::format(R"JSON(
+  fmt::print(traceOf_, R"JSON(
   {{
     "name": "process_name", "ph": "M", "ts": {}.{:03}, "pid": -1, "tid": 0,
     "args": {{
@@ -287,7 +299,7 @@ void ChromeTraceLogger::handleTraceSpan(const TraceSpan& span) {
   // a guard to prevent this.
   uint64_t dur = (span.endTime == 0) ? 0 : span.endTime - span.startTime;
   // clang-format off
-  traceOf_ << fmt::format(R"JSON(
+  fmt::print(traceOf_, R"JSON(
   {{
     "ph": "X", "cat": "Trace", "ts": {}.{:03}, "dur": {}.{:03},
     "pid": "Spans", "tid": "{}",
@@ -323,7 +335,7 @@ void ChromeTraceLogger::addIterationMarker(const TraceSpan& span) {
   // clang-format off
   uint64_t start = transToRelativeTime(span.startTime);
 
-  traceOf_ << fmt::format(R"JSON(
+  fmt::print(traceOf_, R"JSON(
   {{
     "name": "Iteration Start: {}", "ph": "i", "s": "g",
     "pid": "Traces", "tid": "Trace {}", "ts": {}.{:03}
@@ -340,7 +352,8 @@ void ChromeTraceLogger::handleGenericInstantEvent(
   }
 
   uint64_t ts = transToRelativeTime(op.timestamp());
-  traceOf_ << fmt::format(
+  fmt::print(
+      traceOf_,
       R"JSON(
   {{
     "ph": "i", "cat": "{}", "s": "t", "name": "{}",
@@ -437,18 +450,19 @@ void ChromeTraceLogger::handleActivity(const libkineto::ITraceActivity& op) {
       if (!arg_values.empty()) {
         arg_values.append(",");
       }
-      arg_values.append(fmt::format(
-          " \"{}\": {}, \"{}\": {}, \"{}\": {}, \"{}\": {}, \"{}\": {}",
-          kCollectiveName,
-          collectiveName,
-          kInMsgNelems,
-          inMsgSize,
-          kOutMsgNelems,
-          outMsgSize,
-          kGroupSize,
-          groupSize,
-          kDtype,
-          dtype));
+      arg_values.append(
+          fmt::format(
+              R"( "{}": {}, "{}": {}, "{}": {}, "{}": {}, "{}": {})",
+              kCollectiveName,
+              collectiveName,
+              kInMsgNelems,
+              inMsgSize,
+              kOutMsgNelems,
+              outMsgSize,
+              kGroupSize,
+              groupSize,
+              kDtype,
+              dtype));
     }
     const auto& input_tensor_starts =
         collectiveRecord->getMetadataValue(kInTensorsStart);
@@ -475,12 +489,13 @@ void ChromeTraceLogger::handleActivity(const libkineto::ITraceActivity& op) {
       if (!arg_values.empty()) {
         arg_values.append(",");
       }
-      arg_values.append(fmt::format(
-          " \"{}\": {}, \"{}\": {}",
-          kInSplit,
-          inSplitSize,
-          kOutSplit,
-          outSplitSize));
+      arg_values.append(
+          fmt::format(
+              R"( "{}": {}, "{}": {})",
+              kInSplit,
+              inSplitSize,
+              kOutSplit,
+              outSplitSize));
     }
     const auto& processGroupName =
         collectiveRecord->getMetadataValue(kProcessGroupName);
@@ -493,7 +508,7 @@ void ChromeTraceLogger::handleActivity(const libkineto::ITraceActivity& op) {
     }
     const auto& processGroupDesc =
         collectiveRecord->getMetadataValue(kProcessGroupDesc);
-    if (!processGroupName.empty()) {
+    if (!processGroupName.empty() && !processGroupDesc.empty()) {
       if (!arg_values.empty()) {
         arg_values.append(",");
       }
@@ -516,7 +531,7 @@ void ChromeTraceLogger::handleActivity(const libkineto::ITraceActivity& op) {
       arg_values.append(fmt::format(", \"{}\": {}", kP2pSrc, srcRank));
     }
 
-    if (distInfo_.backend == "" && processGroupDesc == "\"default_pg\"") {
+    if (distInfo_.backend.empty() && processGroupDesc == "\"default_pg\"") {
       distInfo_.backend = "nccl";
       distInfo_.rank = collectiveRecord->getMetadataValue(kRank);
       distInfo_.world_size = groupSize;
@@ -554,7 +569,7 @@ void ChromeTraceLogger::handleActivity(const libkineto::ITraceActivity& op) {
 
   // clang-format off
   ts = transToRelativeTime(ts);
-  traceOf_ << fmt::format(R"JSON(
+  fmt::print(traceOf_, R"JSON(
   {{
     "ph": "X", "cat": "{}", "name": "{}", "pid": {}, "tid": {},
     "ts": {}.{:03}, "dur": {}.{:03}{}
@@ -611,10 +626,10 @@ void ChromeTraceLogger::handleLink(
   // Flow events much bind to specific slices in order to exist.
   // Only Flow end needs to specify a binding point to enclosing slice.
   // Flow start automatically sets binding point to enclosing slice.
-  const auto binding = (type == kFlowEnd) ? ", \"bp\": \"e\"" : "";
+  const auto binding = (type == kFlowEnd) ? R"(, "bp": "e")" : "";
   // clang-format off
   uint64_t ts = transToRelativeTime(e.timestamp());
-  traceOf_ << fmt::format(R"JSON(
+  fmt::print(traceOf_, R"JSON(
   {{
     "ph": "{}", "id": {}, "pid": {}, "tid": {}, "ts": {}.{:03},
     "cat": "{}", "name": "{}"{}
@@ -632,10 +647,11 @@ void ChromeTraceLogger::finalizeTrace(
 }
 
 void ChromeTraceLogger::addOnDemandDistMetadata() {
-  if (distInfo_.backend == "") {
+  if (distInfo_.backend.empty()) {
     return;
   }
-  traceOf_ << fmt::format(
+  fmt::print(
+      traceOf_,
       R"JSON(
   "distributedInfo": {{"backend": "{}", "rank": {}, "world_size": {}, "pg_count": {}, "pg_config": [)JSON",
       distInfo_.backend,
@@ -644,7 +660,8 @@ void ChromeTraceLogger::addOnDemandDistMetadata() {
       std::to_string(pgMap.size()));
 
   for (const auto& element : pgMap) {
-    traceOf_ << fmt::format(
+    fmt::print(
+        traceOf_,
         R"JSON({{"pg_name": {}, "pg_desc": {}, "backend_config": "{}", "pg_size": {}, "ranks": {}}},)JSON",
         element.second.pg_name,
         element.second.pg_desc,
@@ -653,8 +670,10 @@ void ChromeTraceLogger::addOnDemandDistMetadata() {
         element.second.ranks);
   }
   traceOf_.seekp(-1, std::ios_base::end);
-  traceOf_ << fmt::format(
-      R"JSON(], "nccl_version": "{}"}},)JSON", distInfo_.nccl_version);
+  fmt::print(
+      traceOf_,
+      R"JSON(], "nccl_version": "{}"}},)JSON",
+      distInfo_.nccl_version);
   distInfo_.distInfo_present_ = true;
 }
 
@@ -669,7 +688,7 @@ void ChromeTraceLogger::finalizeTrace(
   LOG(INFO) << "Chrome Trace written to " << fileName_;
   // clang-format off
   endTime = transToRelativeTime(endTime);
-  traceOf_ << fmt::format(R"JSON(
+  fmt::print(traceOf_, R"JSON(
   {{
     "name": "Record Window End", "ph": "i", "s": "g",
     "pid": "", "tid": "", "ts": {}.{:03}
@@ -707,7 +726,7 @@ void ChromeTraceLogger::finalizeTrace(
 #endif // !USE_GOOGLE_LOG
 
   // Putting this here because the last entry MUST not end with a comma.
-    traceOf_ << fmt::format(R"JSON(
+  fmt::print(traceOf_, R"JSON(
   "traceName": "{}"
 }})JSON", fileName_);
 

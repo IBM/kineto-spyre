@@ -143,7 +143,7 @@ const std::string& devicePropertiesJson() {
 }
 #else
 const std::string& devicePropertiesJson() {
-  static std::string devicePropsJson = "";
+  static std::string devicePropsJson;
   return devicePropsJson;
 }
 

@@ -9,14 +9,15 @@
 #include "ConfigLoader.h"
 
 #ifdef __linux__
-#include <signal.h>
+#include <csignal>
 #endif
 
-#include <stdlib.h>
 #include <chrono>
+#include <cstdlib>
 #include <fstream>
 #include <functional>
 #include <memory>
+#include <utility>
 
 #include "DaemonConfigLoader.h"
 
@@ -117,7 +118,7 @@ daemonConfigLoaderFactory() {
 
 void ConfigLoader::setDaemonConfigLoaderFactory(
     std::function<std::unique_ptr<IDaemonConfigLoader>()> factory) {
-  daemonConfigLoaderFactory() = factory;
+  daemonConfigLoaderFactory() = std::move(factory);
 }
 
 ConfigLoader& ConfigLoader::instance() {

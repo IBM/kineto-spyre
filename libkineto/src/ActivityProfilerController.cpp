@@ -11,6 +11,7 @@
 #include <chrono>
 #include <functional>
 #include <thread>
+#include <utility>
 
 #include "ActivityLoggerFactory.h"
 #include "ActivityTrace.h"
@@ -37,7 +38,7 @@ static std::shared_ptr<LoggerCollector>& loggerCollectorFactory() {
 }
 
 void ActivityProfilerController::setLoggerCollectorFactory(
-    std::function<std::shared_ptr<LoggerCollector>()> factory) {
+    const std::function<std::shared_ptr<LoggerCollector>()>& factory) {
   loggerCollectorFactory() = factory();
 }
 
@@ -77,12 +78,14 @@ ActivityProfilerController::ActivityProfilerController(
 
 ActivityProfilerController::~ActivityProfilerController() {
   configLoader_.removeHandler(ConfigLoader::ConfigKind::ActivityProfiler, this);
-  if (profilerThread_) {
-    // signaling termination of the profiler loop
-    stopRunloop_ = true;
-    profilerThread_->join();
-    delete profilerThread_;
-    profilerThread_ = nullptr;
+  for (auto profilerThread : profilerThreads_) {
+    if (profilerThread) {
+      // signaling termination of the profiler loop
+      stopRunloop_ = true;
+      profilerThread->join();
+      delete profilerThread;
+      profilerThread = nullptr;
+    }
   }
 
 #if !USE_GOOGLE_LOG
@@ -108,7 +111,7 @@ static ActivityLoggerFactory& loggerFactory() {
 void ActivityProfilerController::addLoggerFactory(
     const std::string& protocol,
     ActivityLoggerFactory::FactoryFunc factory) {
-  loggerFactory().addProtocol(protocol, factory);
+  loggerFactory().addProtocol(protocol, std::move(factory));
 }
 
 static std::unique_ptr<ActivityLogger> makeLogger(const Config& config) {
@@ -151,9 +154,9 @@ bool ActivityProfilerController::shouldActivateTimestampConfig(
   }
   // Note on now + Config::kControllerIntervalMsecs:
   // Profiler interval does not align perfectly up to startTime - warmup.
-  // Waiting until the next tick won't allow sufficient time for the profiler to
-  // warm up. So check if we are very close to the warmup time and trigger
-  // warmup.
+  // Waiting until the next tick won't allow sufficient time for the
+  // profiler to warm up. So check if we are very close to the warmup time
+  // and trigger warmup.
   if (now + Config::kControllerIntervalMsecs >=
       (asyncRequestConfig_->requestTimestamp() -
        asyncRequestConfig_->activitiesWarmupDuration())) {
@@ -198,8 +201,8 @@ bool ActivityProfilerController::shouldActivateIterationConfig(
                 << newProfileStart;
       asyncRequestConfig_->setProfileStartIteration(newProfileStart);
       if (currentIter != asyncRequestConfig_->startIterationIncludingWarmup()) {
-        // Ex. Current 9, start 8, warmup 5, roundup 100. Resolves new start to
-        // 100, with warmup starting at 95. So don't start now.
+        // Ex. Current 9, start 8, warmup 5, roundup 100. Resolves new start
+        // to 100, with warmup starting at 95. So don't start now.
         return false;
       }
     } else {
@@ -239,7 +242,7 @@ void ActivityProfilerController::profilerLoop() {
       next_wakeup_time += Config::kControllerIntervalMsecs;
     }
 
-    if (profiler_->isActive()) {
+    if (profiler_->isActive() && !profiler_->isCollectingMemorySnapshot()) {
       next_wakeup_time = profiler_->performRunLoopStep(now, next_wakeup_time);
       VLOG(1) << "Profiler loop: "
               << duration_cast<milliseconds>(system_clock::now() - now).count()
@@ -251,9 +254,6 @@ void ActivityProfilerController::profilerLoop() {
 }
 
 void ActivityProfilerController::memoryProfilerLoop() {
-  std::string path = asyncRequestConfig_->activitiesLogFile();
-  auto profile_time = asyncRequestConfig_->profileMemoryDuration();
-  std::unique_ptr<Config> config = asyncRequestConfig_->clone();
   while (!stopRunloop_) {
     // Perform Double-checked locking to reduce overhead of taking lock.
     if (asyncRequestConfig_ && !profiler_->isActive()) {
@@ -261,18 +261,14 @@ void ActivityProfilerController::memoryProfilerLoop() {
       if (asyncRequestConfig_ && !profiler_->isActive() &&
           asyncRequestConfig_->memoryProfilerEnabled()) {
         logger_ = makeLogger(*asyncRequestConfig_);
-        path = asyncRequestConfig_->activitiesLogFile();
-        profile_time = asyncRequestConfig_->profileMemoryDuration();
-        config = asyncRequestConfig_->clone();
+        auto path = asyncRequestConfig_->activitiesLogFile();
+        auto profile_time = asyncRequestConfig_->profileMemoryDuration();
+        auto config = asyncRequestConfig_->clone();
         asyncRequestConfig_ = nullptr;
-      } else {
-        continue;
+        profiler_->performMemoryLoop(
+            path, profile_time, logger_.get(), *config);
       }
-    } else {
-      continue;
     }
-
-    profiler_->performMemoryLoop(path, profile_time, logger_.get(), *config);
   }
 }
 
@@ -291,7 +287,7 @@ void ActivityProfilerController::step() {
       activateConfig(now);
     }
   }
-  if (profiler_->isActive()) {
+  if (profiler_->isActive() && !profiler_->isCollectingMemorySnapshot()) {
     auto now = system_clock::now();
     auto next_wakeup_time = now + Config::kControllerIntervalMsecs;
     profiler_->performRunLoopStep(now, next_wakeup_time, currentIter);
@@ -314,18 +310,34 @@ void ActivityProfilerController::scheduleTrace(const Config& config) {
     LOG(WARNING) << "Ignored request - profiler busy";
     return;
   }
+
   int64_t currentIter = iterationCount_;
+  std::unique_ptr<Config> configToSchedule;
+
   if (config.hasProfileStartIteration() && currentIter < 0) {
-    LOG(WARNING) << "Ignored profile iteration count based request as "
-                 << "application is not updating iteration count";
-    return;
+    // Special case: daemon config with activitiesDuration set
+    if (config.activitiesDuration().count() > 0) {
+      LOG(INFO) << "Config with duration-based profiling, "
+                << "ignoring iteration count requirement";
+      // Continue with modified config - clone and set profileStartIteration to
+      // -1
+      configToSchedule = config.clone();
+      configToSchedule->setProfileStartIteration(-1);
+    } else {
+      LOG(WARNING) << "Ignored profile iteration count based request as "
+                   << "application is not updating iteration count";
+      return;
+    }
+  } else {
+    configToSchedule = config.clone();
   }
 
+  // Common scheduling logic
   bool newConfigScheduled = false;
   if (!asyncRequestConfig_) {
     std::lock_guard<std::mutex> lock(asyncConfigLock_);
     if (!asyncRequestConfig_) {
-      asyncRequestConfig_ = config.clone();
+      asyncRequestConfig_ = std::move(configToSchedule);
       newConfigScheduled = true;
     }
   }
@@ -335,12 +347,17 @@ void ActivityProfilerController::scheduleTrace(const Config& config) {
   }
 
   // start a profilerLoop() thread to handle request
-  if (!profilerThread_) {
-    if (config.memoryProfilerEnabled()) {
-      profilerThread_ = new std::thread(
+
+  if (config.memoryProfilerEnabled()) {
+    auto thread_type = ThreadType::MEMORY_SNAPSHOT;
+    if (!profilerThreads_[thread_type]) {
+      profilerThreads_[thread_type] = new std::thread(
           &ActivityProfilerController::memoryProfilerLoop, this);
-    } else {
-      profilerThread_ =
+    }
+  } else {
+    auto thread_type = ThreadType::KINETO;
+    if (!profilerThreads_[thread_type]) {
+      profilerThreads_[thread_type] =
           new std::thread(&ActivityProfilerController::profilerLoop, this);
     }
   }
@@ -379,8 +396,8 @@ ActivityProfilerController::stopTrace() {
   UST_LOGGER_MARK_COMPLETED(kCollectionStage);
   auto logger = std::make_unique<MemoryTraceLogger>(profiler_->config());
   profiler_->processTrace(*logger);
-  // Will follow up with another patch for logging URLs when ActivityTrace is
-  // moved.
+  // Will follow up with another patch for logging URLs when ActivityTrace
+  // is moved.
   UST_LOGGER_MARK_COMPLETED(kPostProcessingStage);
 
   // Logger Metadata contains a map of LOGs collected in Kineto

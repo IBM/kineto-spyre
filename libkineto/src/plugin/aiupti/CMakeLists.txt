@@ -5,12 +5,15 @@
 # AIU_aiupti_LIBRARY --  AIUPTI dependencies lib
 # AIUPTI_BUILD_FLAGS  --  AIUPTI build flags
 
-set(LIBKINETO_NOAIUPTI OFF CACHE STRING "" FORCE PARENT_SCOPE)
+# Clean up old/bad definitions
+unset(LIBKINETO_NOAIUPTI CACHE)
+
+set(LIBKINETO_NOAIUPTI OFF CACHE BOOL "Disable AIUPTI" FORCE)
 
 if((NOT AIU_INCLUDE_DIR) OR (NOT AIU_LIBRARY_DIR))
     include(FindAIUToolkit.cmake)
     if(NOT AIUTOOLKIT_FOUND)
-        set(LIBKINETO_NOAIUPTI ON CACHE STRING "" FORCE PARENT_SCOPE)
+        set(LIBKINETO_NOAIUPTI ON CACHE BOOL "Disable AIUPTI" FORCE)
         message(WARNING "AIU PTI has not built because ${AIU_NOT_FOUND_MESSAGE}")
         return()
     endif()

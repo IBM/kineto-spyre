@@ -9,9 +9,10 @@
 #include <CuptiRangeProfilerConfig.h>
 #include <Logger.h>
 
-#include <stdlib.h>
+#include <cstdlib>
 
 #include <fmt/format.h>
+#include <fmt/ostream.h>
 #include <fmt/ranges.h>
 #include <ostream>
 
@@ -28,9 +29,7 @@ constexpr char kCuptiProfilerPerKernelKey[] =
 constexpr char kCuptiProfilerMaxRangesKey[] = "CUPTI_PROFILER_MAX_RANGES";
 
 CuptiRangeProfilerConfig::CuptiRangeProfilerConfig(Config& cfg)
-    : parent_(&cfg),
-      cuptiProfilerPerKernel_(false),
-      cuptiProfilerMaxRanges_(0) {}
+    : parent_(&cfg) {}
 
 bool CuptiRangeProfilerConfig::handleOption(
     const std::string& name,
@@ -59,12 +58,14 @@ void CuptiRangeProfilerConfig::setDefaults() {
 void CuptiRangeProfilerConfig::printActivityProfilerConfig(
     std::ostream& s) const {
   if (activitiesCuptiMetrics_.size() > 0) {
-    s << "Cupti Profiler metrics : "
-      << fmt::format("{}", fmt::join(activitiesCuptiMetrics_, ", "))
-      << std::endl;
-    s << "Cupti Profiler measure per kernel : " << cuptiProfilerPerKernel_
-      << std::endl;
-    s << "Cupti Profiler max ranges : " << cuptiProfilerMaxRanges_ << std::endl;
+    fmt::print(
+        s,
+        "Cupti Profiler metrics : {}\n"
+        "Cupti Profiler measure per kernel : {}\n"
+        "Cupti Profiler max ranges : {}\n",
+        fmt::join(activitiesCuptiMetrics_, ", "),
+        cuptiProfilerPerKernel_,
+        cuptiProfilerMaxRanges_);
   }
 }
 

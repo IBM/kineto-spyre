@@ -10,6 +10,7 @@
 
 #include <fmt/format.h>
 #include <array>
+#include <limits>
 #include <sstream>
 
 #include "Logger.h"
@@ -43,7 +44,7 @@ static inline string trim(string& s) {
 // Return the index of char d in string s.
 // If not found, returns the length of the string.
 static int find(const char* s, char delim) {
-  int i;
+  int i = 0;
   for (i = 0; s[i]; i++) {
     if (s[i] == delim) {
       break;
@@ -65,7 +66,7 @@ static vector<string> split(const string& s, char delim) {
 
 // Remove a trailing comment.
 static inline string stripComment(const string& s) {
-  std::size_t pos = s.find("#");
+  std::size_t pos = s.find('#');
   return s.substr(0, pos);
 }
 
@@ -96,23 +97,24 @@ vector<string> AbstractConfig::splitAndTrim(const string& s, char delim) const {
 
 int64_t AbstractConfig::toIntRange(const string& val, int64_t min, int64_t max)
     const {
-  char* invalid;
+  char* invalid = nullptr;
   int64_t res = strtoll(val.c_str(), &invalid, 10);
   if (val.empty() || *invalid) {
     throw std::invalid_argument(fmt::format("Invalid integer: {}", val));
   } else if (res < min || res > max) {
-    throw std::invalid_argument(fmt::format(
-        "Invalid argument: {} - expected range [{}, {}]", res, min, max));
+    throw std::invalid_argument(
+        fmt::format(
+            "Invalid argument: {} - expected range [{}, {}]", res, min, max));
   }
   return res;
 }
 
 int32_t AbstractConfig::toInt32(const string& val) const {
-  return toIntRange(val, 0, ~0u / 2);
+  return toIntRange(val, 0, std::numeric_limits<int32_t>::max());
 }
 
 int64_t AbstractConfig::toInt64(const string& val) const {
-  return toIntRange(val, 0, ~0ul / 2);
+  return toIntRange(val, 0, std::numeric_limits<int64_t>::max());
 }
 
 bool AbstractConfig::toBool(string& val) const {
@@ -125,7 +127,6 @@ bool AbstractConfig::toBool(string& val) const {
     }
   }
   throw std::invalid_argument(fmt::format("Invalid bool argument: {}", val));
-  return false;
 }
 
 bool AbstractConfig::parse(const string& conf) {
