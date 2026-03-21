@@ -1,8 +1,14 @@
 # ignore common items
 .idea
 .vscode
+.claude
 .data
 __pycache__
 
 # Hypothesis property-test example database/cache
 .hypothesis/
+
+*.pyc
+
+# CMake build output
+libkineto/build/
