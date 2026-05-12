@@ -7,7 +7,7 @@ ARCH="$(uname -m)"
 # PyTorch Build Automation
 # ------------------------
 
-PYTORCH_VERSION="2.10.0"
+PYTORCH_VERSION="2.11.0"
 KINETO_VERSION="1.1.2"
 PYTORCH_BUILD_SUFFIX="+aiu.kineto."$KINETO_VERSION
 CONDA_ENV_NAME="buildenv-torch"
