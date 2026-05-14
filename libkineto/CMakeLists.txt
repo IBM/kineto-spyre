@@ -80,7 +80,7 @@ else()
   set(LIBKINETO_NOXPUPTI ON)
 endif()
 
-if(DEFINED LIBKINETO_NOAIUPTI AND NOT LIBKINETO_NOAIUPTI)
+if(NOT LIBKINETO_NOAIUPTI)
   add_subdirectory(src/plugin/aiupti)
 else()
   set(LIBKINETO_NOAIUPTI ON)
