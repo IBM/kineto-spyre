@@ -7,7 +7,7 @@ ARCH="$(uname -m)"
 # PyTorch Build Automation
 # ------------------------
 
-PYTORCH_VERSION="2.10.0"
+PYTORCH_VERSION="2.11.0"
 KINETO_VERSION="1.1.2"
 PYTORCH_BUILD_SUFFIX="+aiu.kineto."$KINETO_VERSION
 CONDA_ENV_NAME="buildenv-torch"
@@ -48,6 +48,13 @@ function create_conda_env() {
     
   CONDA_PKGS=(
     python=$PYTHON_VERSION
+    # PyTorch 2.11's setup.py imports setuptools.command.bdist_wheel at module
+    # scope, which requires setuptools>=70.1. Recent conda python packages no
+    # longer bundle setuptools, so pin it here. Upper bound matches PyTorch's
+    # own pyproject.toml dev group (<80.0: setup.py develop was deprecated in 80).
+    "setuptools>=70.1,<80"
+    wheel
+    pip
   )
 
   ARCH="$(uname -m)"
@@ -160,6 +167,13 @@ function build_pytorch() {
   export PYTORCH_BUILD_NUMBER=0
 
   pip3 --no-cache-dir install -r requirements.txt
+
+  # Re-assert setuptools bounds after requirements.txt install: requirements.txt
+  # pulls requirements-build.txt which only sets setuptools>=70.1.0 with no upper
+  # bound, and will happily install 81.x — but PyTorch's direct `python setup.py`
+  # invocations need setuptools<80 (80.0 removed setup.py develop; some paths
+  # misbehave at 81+).
+  pip3 --no-cache-dir install --force-reinstall "setuptools>=70.1,<80" wheel
 
   python3 setup.py clean
 
