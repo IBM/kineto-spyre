@@ -13,7 +13,7 @@ on:
 
 jobs:
   release-wheel:
-    runs-on: [self-hosted, linux, x64, aiu]
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 360
     env:
       LIBAIUPTI_INSTALL_DIR: ${{ github.event.inputs.libaiupti_install_dir || '/opt/libaiupti' }}
