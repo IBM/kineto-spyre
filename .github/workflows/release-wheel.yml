@@ -5,13 +5,18 @@ on:
     tags:
       - 'kineto-2.11*'
   workflow_dispatch:
+    inputs:
+      libaiupti_install_dir:
+        description: 'Absolute path to libaiupti installation on the runner'
+        required: true
+        default: '/opt/libaiupti'
 
 jobs:
   release-wheel:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64, aiu]
     timeout-minutes: 360
     env:
-      LIBAIUPTI_INSTALL_DIR: /opt/libaiupti
+      LIBAIUPTI_INSTALL_DIR: ${{ github.event.inputs.libaiupti_install_dir || '/opt/libaiupti' }}
 
     steps:
       - name: Checkout repository
@@ -31,10 +36,10 @@ jobs:
 
       - name: Verify AIUPTI path is configured
         run: |
-          test -d "${LIBAIUPTI_INSTALL_DIR}" || {
-            echo "Missing LIBAIUPTI_INSTALL_DIR=${LIBAIUPTI_INSTALL_DIR}";
-            exit 1;
-          }
+          if [ ! -d "${LIBAIUPTI_INSTALL_DIR}" ]; then
+            echo "Missing LIBAIUPTI_INSTALL_DIR=${LIBAIUPTI_INSTALL_DIR}"
+            exit 1
+          fi
 
       - name: Build PyTorch wheel with Kineto Spyre
         run: |
@@ -44,15 +49,22 @@ jobs:
       - name: Validate wheel exists
         run: |
           compgen -G "/project_src/pytorch/dist/*.whl" > /dev/null || {
-            echo "No wheel produced in /project_src/pytorch/dist/";
-            exit 1;
+            echo "No wheel produced in /project_src/pytorch/dist/"
+            exit 1
+          }
+
+      - name: Validate build log exists
+        run: |
+          test -f /project_src/pytorch/build.log || {
+            echo "Missing build log at /project_src/pytorch/build.log"
+            exit 1
           }
 
       - name: Validate AIUPTI was detected
         run: |
-          grep -E "AIU_INCLUDE_DIR|AIU_LIBRARY|Building with aiupti|HAS_AIUPTI" /project_src/pytorch/build.log || {
-            echo "AIUPTI validation failed: expected markers not found in build.log";
-            exit 1;
+          grep -E "AIU_INCLUDE_DIR|AIU_LIBRARY|Building with aiupti|HAS_AIUPTI" /project_src/pytorch/build.log > /dev/null || {
+            echo "AIUPTI validation failed: expected markers not found in build.log"
+            exit 1
           }
 
       - name: Upload wheel artifacts
