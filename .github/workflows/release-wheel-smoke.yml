@@ -1,0 +1,43 @@
+name: Release wheel smoke checks
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/release-wheel-smoke.yml'
+      - 'scripts/build_pytorch.sh'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify workflow shell environment
+        run: |
+          python --version
+          bash --version
+
+      - name: Verify build script exists
+        run: |
+          test -f ./scripts/build_pytorch.sh
+
+      - name: Verify build script is executable
+        run: |
+          chmod +x ./scripts/build_pytorch.sh
+          test -x ./scripts/build_pytorch.sh
+
+      - name: Verify build script syntax
+        run: |
+          bash -n ./scripts/build_pytorch.sh
+
