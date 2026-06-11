@@ -7,7 +7,8 @@ Specifically, this repo is a modified version of libKineto that implements the s
 
 See the [here](docs/devel/README.md) for more details how to install and use it.
 
-The last upstream sync was with the commit `7a731b6ae01cfc2b1fc75d83a91f84e682e43fd7`.
+The last upstream sync was with the commit `b2103f78d13fde4937af010c0ef8e24313568bc5`.
+This release targets PyTorch `2.12`.
 
 # Installation
 
