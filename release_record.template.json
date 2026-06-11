@@ -1,0 +1,17 @@
+{
+  "release": "torch-2.12.0+aiu.kineto.1.2.0",
+  "target_pytorch": "2.12.0",
+  "pinned_kineto_commit": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+  "previous_last_sync_commit": "7a731b6ae01cfc2b1fc75d83a91f84e682e43fd7",
+  "new_last_sync_commit": "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678",
+  "integrated_commits": [
+    "0123456789abcdef0123456789abcdef01234567",
+    "a1b2c3d4e5f60718293a4b5c6d7e8f9012345678"
+  ],
+  "subcomponents": {
+    "libaiupti": "1.0.0",
+    "aiu_toolkit": "2.3.1",
+    "pytorch": "2.12.0",
+    "kineto_spyre": "1.2.0"
+  }
+}
