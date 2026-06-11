@@ -1,22 +1,40 @@
 #!/bin/bash
 set -e
+set -o pipefail
 
 ARCH="$(uname -m)"
+
+# Source the guard helpers (version/kineto/PrivateUse1/AIUPTI/subcomponent/wheel
+# gates). Factored into scripts/build_lib.sh so each gate is independently
+# unit-testable without cloning PyTorch or running a real build.
+_BUILD_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=scripts/build_lib.sh
+source "$_BUILD_LIB_DIR/build_lib.sh"
 
 # ------------------------
 # PyTorch Build Automation
 # ------------------------
 
-PYTORCH_VERSION="2.11.0"
-KINETO_VERSION="1.1.2"
+# 2.12 release (Req 2.3, 5.2): target PyTorch 2.12.0. Python 3.12 (cp312) is the
+# release ABI — the conda env below pins python to 3.12 so the wheel is cp312
+# rather than whatever the host default happens to be.
+PYTORCH_VERSION="2.12.0"
+PYTHON_RELEASE_VERSION="${PYTHON_RELEASE_VERSION:-3.12}"
+# Kineto subcomponent version for the build suffix; sourced from
+# release_record.json when present, else falls back to this default.
+KINETO_VERSION="${KINETO_VERSION:-1.2.0}"
 PYTORCH_BUILD_SUFFIX="+aiu.kineto."$KINETO_VERSION
 CONDA_ENV_NAME="buildenv-torch"
 CONDA_DIR="$HOME/miniconda"
 
 _SRC=${PYTORCH_SRC:-/project_src/}
 _KINETO_DIR=${KINETO_DIR:-$(pwd)}
+# Release record providing recorded subcomponent versions (Req 9.1–9.5).
+RELEASE_RECORD="${RELEASE_RECORD:-$_KINETO_DIR/release_record.json}"
 
-PYTHON_VERSION=$(python3 -c "import sys; print('.'.join(map(str, sys.version_info[:3])))")
+# Pin the build Python to the release ABI (cp312) rather than inheriting the
+# host default, so the wheel is the cp312 wheel the release ships.
+PYTHON_VERSION="${PYTHON_RELEASE_VERSION}"
 
 # Derive Python ABI tag for wheel naming
 PYTHON_MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
@@ -92,30 +110,58 @@ function clone_pytorch() {
   mkdir -p $_SRC
   cd $_SRC
 
+  # 4a. Fetch the pinned PyTorch 2.12 source when absent (Req 5.1).
   if [ ! -d "pytorch" ]; then
     echo "Cloning PyTorch $PYTORCH_VERSION..."
     git clone --recursive -b "v$PYTORCH_VERSION" https://github.com/pytorch/pytorch.git
     cd pytorch
     git submodule sync
     git submodule update --init --recursive --jobs 1
-
-    echo "Replacing Kineto with the aiu-kineto"
-    rm -rf third_party/kineto
-    cp -r ${_KINETO_DIR} third_party/kineto
   else
     echo "PyTorch repo already exists"
-    echo "Replacing Kineto with the aiu-kineto"
     cd pytorch
-    rm -rf third_party/kineto
-    cp -r ${_KINETO_DIR} third_party/kineto
   fi
+
+  # 4a. Verify the obtained source really is 2.12.x; report a mismatch and stop
+  # before building otherwise (Req 2.7, 5.7).
+  verify_pytorch_version "$PWD/version.txt"
+
+  # 4b. Replace the entire third_party/kineto with Kineto_Spyre so no upstream
+  # files remain (Req 5.3), then verify the replacement (AIU plugin present) and
+  # stop on a replacement failure (Req 5.8).
+  echo "Replacing Kineto with the aiu-kineto"
+  rm -rf third_party/kineto
+  cp -r ${_KINETO_DIR} third_party/kineto
+  verify_kineto_replacement "$PWD"
+
+  # 4c. PrivateUse1 registration must be present in the obtained source; halt
+  # before the wheel build and emit a build.log entry naming the missing
+  # dependency otherwise (Req 3.1, 3.2).
+  check_privateuse1 "$PWD" "$PWD/build.log"
 }
 
 function build_pytorch() {
   echo "Building PyTorch $PYTORCH_VERSION"
   cd $_SRC/pytorch
 
-  rm -rf build dist
+  # Clear dist/ so no stale/partial wheel survives (Req 5.6). build/ is also
+  # cleared, preserving the original behaviour.
+  rm -rf build
+  clean_dist dist
+
+  # 4e. Verify each recorded subcomponent version before building (Req 9.2–9.5).
+  # When a release record is present, build only against the recorded versions;
+  # a missing, unobtainable, or mismatched version stops before any wheel.
+  if [ -f "$RELEASE_RECORD" ]; then
+    PYTORCH_ROOT="$PWD" verify_subcomponents "$RELEASE_RECORD"
+  else
+    echo "WARNING: no release record at $RELEASE_RECORD — skipping subcomponent version verification" >&2
+  fi
+
+  # 4d. libaiupti must be discoverable. CMake (FindAIUToolkit.cmake) searches
+  # LIBAIUPTI_INSTALL_DIR first, then falls back to LD_LIBRARY_PATH (Req 4.1).
+  # Require LIBAIUPTI_INSTALL_DIR for the release build so detection is exercised.
+  export LIBAIUPTI_INSTALL_DIR="${LIBAIUPTI_INSTALL_DIR:?LIBAIUPTI_INSTALL_DIR must be set for the release build (Req 4.1)}"
 
   # Disable CUDA
   export USE_CUDA=0
@@ -163,8 +209,11 @@ function build_pytorch() {
 
   export CMAKE_PREFIX_PATH=${CONDA_PREFIX:-"$(dirname $(which conda))/../"}:$CMAKE_PREFIX_PATH
 
+  # 4f. Set the build version to the 2.12 release version (Req 2.3, 5.2) and
+  # assert it targets 2.12 before invoking the build.
   export PYTORCH_BUILD_VERSION="${PYTORCH_VERSION}${PYTORCH_BUILD_SUFFIX}"
   export PYTORCH_BUILD_NUMBER=0
+  assert_build_version "$PYTORCH_BUILD_VERSION"
 
   pip3 --no-cache-dir install -r requirements.txt
 
@@ -177,8 +226,18 @@ function build_pytorch() {
 
   python3 setup.py clean
 
-  # Build PyTorch first to embed the OpenMP libraries into the wheel package
-  python3 setup.py build --verbose 2>&1 | tee build.log
+  # Build PyTorch first to embed the OpenMP libraries into the wheel package.
+  # Invoke PyTorch's own setup.py interface UNMODIFIED (Req 5.5); tee to build.log.
+  if ! python3 setup.py build --verbose 2>&1 | tee build.log; then
+    report_build_failure "setup.py build" "dist"
+    exit 1
+  fi
+
+  # 4d. AIUPTI detection hard gate (Req 4.3, 4.4, 4.6): scan build.log for the
+  # CMake "AIU library found:" line. Emits the detected/not-detected build.log
+  # entry and aborts (non-zero, no wheel) when libaiupti was not detected. This
+  # gate is unconditional — no override flag, no warning-and-continue path.
+  assert_aiupti_detected "$PWD/build.log"
 
   # Copy the OpenMP libraries into the appropriate PyTorch lib directory within the build
   if [[ "$ARCH" == "x86_64" ]]; then
@@ -186,7 +245,17 @@ function build_pytorch() {
     cp $CONDA_PREFIX/lib/libomp* build/lib.linux-$ARCH-cpython-${PYTHON_MAJOR}${PYTHON_MINOR}/torch/lib/
   fi
 
-  python3 setup.py bdist_wheel --python-tag "$PYTHON_TAG" --verbose 2>&1 | tee -a build.log
+  if ! python3 setup.py bdist_wheel --python-tag "$PYTHON_TAG" --verbose 2>&1 | tee -a build.log; then
+    report_build_failure "setup.py bdist_wheel" "dist"
+    exit 1
+  fi
+
+  # 4f. Postcondition: exactly one wheel in dist/ (Req 5.4); 0 or 2+ fails and
+  # removes any partial wheel (Req 5.6).
+  assert_single_wheel "dist"
+
+  # 4e/4.5. Confirm the wheel was built with HAS_AIUPTI.
+  confirm_wheel_has_aiupti "$PWD/build.log"
 
   echo "Build complete. Wheel is in: pytorch/dist/"
   cd ..
