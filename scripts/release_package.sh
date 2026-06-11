@@ -83,6 +83,10 @@ SMOKE_PASSED="${SMOKE_PASSED:-0}"
 PUSH_TAG="${PUSH_TAG:-1}"        # push the tag to REMOTE (Req 10.1)
 DRY_RUN="${DRY_RUN:-1}"          # 1 => never call real `gh`/network (default, test-safe)
 GH_BIN="${GH_BIN:-gh}"           # GitHub CLI binary (stubbable in tests)
+GH_REPO="${GH_REPO:-}"           # target repo for `gh release create` (OWNER/NAME).
+                                 # Empty => gh's default (the repo of REPO_PATH's
+                                 # origin). Set explicitly to publish to a fork
+                                 # (e.g. for testing) or to be unambiguous.
 
 log()  { echo "[release_package] $*"; }
 err()  { echo "[release_package] ERROR: $*" >&2; }
@@ -297,6 +301,13 @@ publish_release() {
     "$GH_BIN" release create "$TAG"
     --title "$TAG"
     --notes-file "$notes"
+  )
+  # Target an explicit repo when GH_REPO is set (required to publish to a fork;
+  # otherwise gh uses the default repo resolved from REPO_PATH's origin).
+  if [ -n "$GH_REPO" ]; then
+    cmd+=(--repo "$GH_REPO")
+  fi
+  cmd+=(
     "$wheel"
     "${STAGING_DIR}/release_record.json"
   )
