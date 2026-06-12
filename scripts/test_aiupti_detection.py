@@ -21,7 +21,6 @@ Requirements covered: 4.1, 4.2, 4.5.
 from __future__ import annotations
 
 import os
-import shutil
 import subprocess
 import tempfile
 import unittest
