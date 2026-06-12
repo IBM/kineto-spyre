@@ -130,6 +130,16 @@ function clone_pytorch() {
   # files remain (Req 5.3), then verify the replacement (AIU plugin present) and
   # stop on a replacement failure (Req 5.8).
   echo "Replacing Kineto with the aiu-kineto"
+  # Ensure the fork's own submodules (libkineto/third_party/{fmt,googletest,
+  # dynolog}) are populated before copying — fmt is a libkineto build
+  # dependency. This makes the build robust even if KINETO_DIR was cloned
+  # without --recurse-submodules. Skip gracefully if it isn't a git checkout.
+  if [ -f "${_KINETO_DIR}/.gitmodules" ] && git -C "${_KINETO_DIR}" rev-parse --git-dir >/dev/null 2>&1; then
+    echo "Initializing kineto-spyre submodules in ${_KINETO_DIR}"
+    git -C "${_KINETO_DIR}" submodule update --init --recursive
+  else
+    echo "NOTE: ${_KINETO_DIR} is not a git checkout with submodules; assuming submodule contents are already present."
+  fi
   rm -rf third_party/kineto
   cp -r ${_KINETO_DIR} third_party/kineto
   verify_kineto_replacement "$PWD"
