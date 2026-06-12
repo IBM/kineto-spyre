@@ -56,6 +56,9 @@ The 2.12 release builds and runs against:
 - A C/C++ toolchain and CMake, plus the build prerequisites PyTorch 2.12
   requires. `scripts/build_pytorch.sh` provisions an isolated conda environment
   (Python 3.12 + setuptools/wheel/cmake and arch-specific BLAS) for the build.
+- This repo's **git submodules** (`libkineto/third_party/{fmt,googletest,dynolog}`)
+  must be checked out — clone with `--recurse-submodules` (see below). `fmt` is a
+  build dependency of libkineto.
 - Running the trace validator's tests additionally needs **Hypothesis**
   (`pip install hypothesis`).
 
@@ -66,9 +69,12 @@ validate it end to end. The build and trace generation require **AIU hardware**
 with `libaiupti` installed.
 
 ```bash
-# 1. Clone this fork (the integration branch carries the full release pipeline).
-git clone https://github.com/IBM/kineto-spyre.git
+# 1. Clone this fork WITH submodules (libkineto/third_party/{fmt,googletest,dynolog}
+#    are required to build). The integration branch carries the full release pipeline.
+git clone --recurse-submodules https://github.com/IBM/kineto-spyre.git
 cd kineto-spyre
+# If you already cloned without --recurse-submodules:
+#   git submodule update --init --recursive
 
 # 2. Point the build at its inputs.
 export KINETO_DIR="$PWD"                     # this fork -> becomes third_party/kineto
