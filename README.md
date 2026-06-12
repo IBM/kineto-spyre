@@ -10,6 +10,64 @@ See the [here](docs/devel/README.md) for more details how to install and use it.
 The last upstream sync was with the commit `b2103f78d13fde4937af010c0ef8e24313568bc5`.
 This release targets PyTorch `2.12`.
 
+# Dependencies
+
+The 2.12 release builds and runs against:
+
+- **Python 3.12** (the wheel is built as `cp312`).
+- **PyTorch 2.12** (`v2.12.0`) — the build clones this source and replaces its
+  bundled `third_party/kineto` with this fork.
+- **libaiupti** — the AIU profiler runtime. It must be installed and reachable
+  via `LIBAIUPTI_INSTALL_DIR` (or `LD_LIBRARY_PATH`); the build fails hard if it
+  is not detected, so a wheel is never produced without AIU support.
+- A C/C++ toolchain and CMake, plus the build prerequisites PyTorch 2.12
+  requires. `scripts/build_pytorch.sh` provisions an isolated conda environment
+  (Python 3.12 + setuptools/wheel/cmake and arch-specific BLAS) for the build.
+- Running the trace validator's tests additionally needs **Hypothesis**
+  (`pip install hypothesis`).
+
+# Build & test from source (dev environment)
+
+These steps build the PyTorch 2.12 wheel with the AIU-enabled kineto fork and
+validate it end to end. The build and trace generation require **AIU hardware**
+with `libaiupti` installed.
+
+```bash
+# 1. Clone this fork (the integration branch carries the full release pipeline).
+git clone https://github.com/IBM/kineto-spyre.git
+cd kineto-spyre
+
+# 2. Point the build at its inputs.
+export KINETO_DIR="$PWD"                     # this fork -> becomes third_party/kineto
+export PYTORCH_SRC="$PWD/_build"             # where PyTorch v2.12.0 is cloned/built
+export LIBAIUPTI_INSTALL_DIR=/path/to/libaiupti   # REQUIRED — AIUPTI detection gate
+export PYTHON_RELEASE_VERSION=3.12           # build a cp312 wheel
+
+# 3. (If using release_record.json) set the real libaiupti / aiu_toolkit versions
+#    so the build's subcomponent-version gate passes.
+
+# 4. Build the wheel. Clones PyTorch v2.12.0, swaps in this kineto fork, runs the
+#    version / PrivateUse1 / AIUPTI / subcomponent gates, and emits dist/*.whl.
+./scripts/build_pytorch.sh
+
+# 5. Install the built wheel.
+pip install "$PYTORCH_SRC"/pytorch/dist/*.whl
+
+# 6. Generate a profiler trace over an AIU (PrivateUse1) workload and validate it.
+python scripts/gen_trace.py trace.json
+python -m tools.trace_validator trace.json   # expect: VALID (no violations)
+```
+
+Hardware-independent checks (no AIU required) can be run anywhere with Python
+3.12:
+
+```bash
+python3.12 -m venv .venv && . .venv/bin/activate
+pip install hypothesis
+python -m unittest discover -s tools/trace_validator/tests -t .   # validator + property tests
+bash -n scripts/build_pytorch.sh scripts/build_lib.sh             # build-script lint
+```
+
 # Installation
 
 Before installing, check your system configuration:
