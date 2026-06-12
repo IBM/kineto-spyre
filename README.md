@@ -10,6 +10,39 @@ See the [here](docs/devel/README.md) for more details how to install and use it.
 The last upstream sync was with the commit `b2103f78d13fde4937af010c0ef8e24313568bc5`.
 This release targets PyTorch `2.12`.
 
+# What this is (in plain terms)
+
+PyTorch bundles a profiling library called **kineto** (at `third_party/kineto`).
+Upstream kineto only profiles NVIDIA/AMD/Intel devices. **kineto-spyre is IBM's
+fork of kineto that adds an AIU profiler plugin** (`AiuptiActivityApi`, backed by
+the `libaiupti` runtime) so the PyTorch profiler can also capture events from the
+IBM **AIU / Spyre** accelerator. That AIU plugin is the only real difference from
+upstream kineto.
+
+The **2.12 release** is not kineto on its own — it is a full **PyTorch 2.12 wheel
+(Python 3.12 / `cp312`)** in which the bundled kineto has been replaced by this
+fork, so AIU profiling is built in. At a high level the release pipeline:
+
+1. **Sync** — find the exact upstream kineto commit PyTorch 2.12 pins and
+   cherry-pick every upstream change since the last sync into this fork.
+   (The fork's history was squashed, so there is no shared ancestor to merge —
+   hence cherry-pick. PyTorch and kineto give no compatibility guarantee, so we
+   pin to the exact commit.)
+2. **Build** — clone PyTorch 2.12, replace `third_party/kineto` with this fork,
+   and build the `cp312` wheel. The build **fails hard if `libaiupti` is not
+   detected**, so it can never silently ship a wheel that emits no AIU events
+   (the historical failure mode).
+3. **Validate** — run the profiler over a small AIU workload and check the trace
+   has real AIU events (positive timing, no impossible overlaps, well-formed).
+4. **CI** — run the build + validation automatically (a self-hosted AIU runner
+   does the real end-to-end build; GitHub-hosted runners do the hardware-free
+   checks).
+5. **Tag & package** — tag `torch-2.12.0.aiu.kineto.<x.y.z>` and publish the
+   GitHub release (wheel + provenance).
+
+These five stages map 1:1 to the five release PRs. See `RELEASE_NOTES.md` for the
+integrated upstream commits and API changes.
+
 # Dependencies
 
 The 2.12 release builds and runs against:
