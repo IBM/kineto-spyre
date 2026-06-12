@@ -11,7 +11,43 @@
 
 Full provenance is in the committed `release_record.json`.
 
+## API changes (from the upstream kineto sync)
+
+These public-header changes come from the integrated upstream commits
+(`libkineto/include/`, range `7a731b6..b2103f78`). The AIU plugin's own API
+(`AiuptiActivityApi`) is unchanged — the sync preserves it.
+
+### Semantic changes
+
+- **`ActivityType.h`**
+  - Every enumerator now has an explicit numeric value (`USER_ANNOTATION = 1` … `ENUM_COUNT = 26`).
+  - New activity types: `MTIA_COUNTERS = 17`, **`PRIVATEUSE1_RUNTIME = 24`**, **`PRIVATEUSE1_DRIVER = 25`** (PrivateUse1 = AIU-relevant).
+  - `toString(ActivityType)` is now an inline, compile-time header function (no libkineto link needed); new `toActivityType(const std::string&)`; enum↔string map moved into the header; new `constexpr int defaultActivityTypeCount`.
+- **`IActivityProfiler.h`**
+  - `availableActivities()` is now `const` and pure virtual (`= 0`).
+  - `processTrace(...)` and `configure(...)` signatures changed (e.g. `configure(const std::set<ActivityType>& activity_types, …)`).
+  - `DeviceInfo` / `ResourceInfo` constructors take args by value + `std::move`; `ResourceInfo` argument order changed to `(deviceId, id, sortIndex, name)`.
+- **`GenericTraceActivity.h`** — new public `addCounterValue(const std::string&, double)` and `counterValues()` (override), supporting counter events.
+- **`ILoggerObserver.h`** — `LoggerOutputType` now has explicit values plus a new `USDT = 5` output type (`ENUM_COUNT = 6`); `kEmptyTrace` is `constexpr char[]`.
+- **`EnvMetadata.h`** — adds `host_name` to trace metadata via `gethostname()` (+ Windows `ws2_32` link pragma).
+- **`ActivityProfilerInterface.h`** — `addMetadata(...)` is pure virtual (`= 0`).
+
+Most likely to affect downstream code: the `IActivityProfiler` signature/const
+changes (anything implementing that interface) and the new `PRIVATEUSE1_*` /
+`MTIA_COUNTERS` activity types.
+
+### Mostly cosmetic (no behavioral/ABI impact)
+
+clang-format reflows (multi-line signatures collapsed) and `[[maybe_unused]]`
+parameter annotations across `ActivityProfilerInterface.h`,
+`IActivityProfiler.h`, `libkineto.h`, `Config.h`, `AbstractConfig.h`,
+`output_base.h`, `ITraceActivity.h`, `TraceSpan.h`, `time_since_epoch.h`.
+
+> Derived from the header diff between the two pinned commits; the exact set is
+> finalized when the cherry-pick sync runs.
+
 ## Integrated upstream kineto commits (85)
+
 
 Range `7a731b6ae01c..b2103f78d13f` (first exclusive, last inclusive), ascending:
 
