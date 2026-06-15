@@ -101,7 +101,10 @@ function create_conda_env() {
     exit 1
   fi
 
-  conda create -y -n "$CONDA_ENV_NAME" -c conda-forge "${CONDA_PKGS[@]}"
+  # Use ONLY conda-forge (override the defaults channels) so the build does not
+  # depend on the anaconda pkgs/main + pkgs/r channels — avoids the
+  # CondaToSNonInteractiveError (Terms of Service) prompt on fresh machines.
+  conda create -y -n "$CONDA_ENV_NAME" --override-channels -c conda-forge "${CONDA_PKGS[@]}"
 
   echo "Conda environment '$CONDA_ENV_NAME' created for architecture: $ARCH"
 }
