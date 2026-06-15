@@ -101,6 +101,7 @@ jobs:
       - name: Build wheel via the real release path
         env:
           LIBAIUPTI_INSTALL_DIR: ${{ env.LIBAIUPTI_INSTALL_DIR }}
+          VERIFY_SUBCOMPONENTS: "1"   # release path: enforce recorded subcomponent versions (Req 9.2-9.5)
         run: ./scripts/build_pytorch.sh
 
       # Req 8.1 (trace) / 8.4: if trace generation fails, this stage fails
