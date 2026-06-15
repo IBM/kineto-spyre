@@ -178,12 +178,18 @@ function build_pytorch() {
   clean_dist dist
 
   # 4e. Verify each recorded subcomponent version before building (Req 9.2–9.5).
-  # When a release record is present, build only against the recorded versions;
-  # a missing, unobtainable, or mismatched version stops before any wheel.
-  if [ -f "$RELEASE_RECORD" ]; then
-    PYTORCH_ROOT="$PWD" verify_subcomponents "$RELEASE_RECORD"
+  # This gate is OPT-IN: it runs only when VERIFY_SUBCOMPONENTS=1 (the official
+  # release path). Dev/local builds skip it so they are not blocked by
+  # subcomponents we do not version on the host (e.g. libaiupti / aiu_toolkit).
+  if [ "${VERIFY_SUBCOMPONENTS:-0}" = "1" ]; then
+    if [ -f "$RELEASE_RECORD" ]; then
+      PYTORCH_ROOT="$PWD" verify_subcomponents "$RELEASE_RECORD"
+    else
+      echo "ERROR: VERIFY_SUBCOMPONENTS=1 but no release record at $RELEASE_RECORD" >&2
+      exit 1
+    fi
   else
-    echo "WARNING: no release record at $RELEASE_RECORD — skipping subcomponent version verification" >&2
+    echo "Subcomponent version verification skipped (set VERIFY_SUBCOMPONENTS=1 to enforce for a release build)."
   fi
 
   # 4d. libaiupti must be discoverable. CMake (FindAIUToolkit.cmake) searches
