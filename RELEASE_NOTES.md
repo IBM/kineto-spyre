@@ -46,7 +46,53 @@ parameter annotations across `ActivityProfilerInterface.h`,
 > Derived from the header diff between the two pinned commits; the exact set is
 > finalized when the cherry-pick sync runs.
 
+## libkineto changes (PyTorch 2.11 -> 2.12)
+
+The fork's bundled libkineto was synced from the 2.11-era pin
+(`7a731b6`) to the exact commit **PyTorch 2.12** pins (`b2103f78`) — a delta of
+**133 files in `libkineto/`, +8,036 / -4,784**. Why it was required: PyTorch's
+`torch/csrc/profiler/kineto_shim.cpp` is compiled against the kineto API at the
+commit that PyTorch version pins. PyTorch 2.12 references symbols that only
+exist at `b2103f78` (e.g. `ActivityType::MTIA_COUNTERS`), so a fork still at the
+2.11-era kineto fails to compile against the 2.12 source. There is no
+kineto<->PyTorch compatibility guarantee, hence the exact-commit pin.
+
+### Structural changes
+- **Backend-agnostic profiler refactor:** common logic extracted from
+  `CuptiActivityProfiler.cpp` (shrank ~1,485 lines) into the new
+  `GenericActivityProfiler.{cpp,h}` (~1,550 lines) (#1219), so the
+  CUPTI/ROCm/XPU/AIU backends plug into a shared structure.
+- **ROCm moved to rocprofiler-sdk:** new `RocprofActivity*`, `RocprofLogger`,
+  `RocLogger`, `RocmActivityProfiler` files; ROCm 6.4+ uses rocprofiler-sdk
+  instead of libroctracer (#1249) (the CMake block merged next to the AIU guard).
+- **CUPTI:** new `CuptiCbidRegistry.{cpp,h}`; `CuptiActivity` logic moved to
+  headers; NCCL/GPU-kernel metadata and buffer-ordering fixes.
+- **XPU:** profiler split into `XpuptiActivityProfilerSession`.
+- **Chrome-trace writer** (`output_json.cpp`) substantially reworked.
+
+### Public API / header changes (relevant to integrators)
+- `ActivityType.h` — explicit enum values; new `MTIA_COUNTERS=17`,
+  `PRIVATEUSE1_RUNTIME=24`, `PRIVATEUSE1_DRIVER=25`; inline `toString()` + new
+  `toActivityType()`.
+- `IActivityProfiler.h` — `availableActivities()` now `const`+pure-virtual;
+  `processTrace()`/`configure()` signatures changed; `DeviceInfo`/`ResourceInfo`
+  constructors changed.
+- `GenericTraceActivity.h` — new `addCounterValue()` / `counterValues()`.
+- `ILoggerObserver.h` — new `USDT` logger output type.
+- `EnvMetadata.h` — adds `host_name` to trace metadata.
+- `DeviceProperties` — per-backend `devicePropertiesJson()`/`smCount()`
+  consolidated into single functions with internal `#if/#elif`.
+
+### Impact on the AIU plugin (fork code)
+The sync preserved AIU behavior, but two follow-on fixes were needed for 2.12:
+- Re-insert the `HAS_AIUPTI` branch into the refactored consolidated
+  `devicePropertiesJson()`.
+- PyTorch 2.12 builds kineto with `-Wall -Wextra -pedantic -Werror`; latent
+  AIU-plugin warnings (unused params, sign-compare, narrowing) became fatal and
+  were fixed with `[[maybe_unused]]` and value-preserving casts.
+
 ## Integrated upstream kineto commits (85)
+
 
 
 Range `7a731b6ae01c..b2103f78d13f` (first exclusive, last inclusive), ascending:
