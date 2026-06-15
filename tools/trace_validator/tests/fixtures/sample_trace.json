@@ -1,0 +1,40 @@
+{
+  "traceEvents": [
+    {
+      "name": "aten::randn",
+      "ph": "X",
+      "ts": 100,
+      "dur": 50,
+      "pid": 1,
+      "tid": 1,
+      "cat": "cpu_op"
+    },
+    {
+      "name": "aten::matmul",
+      "ph": "X",
+      "ts": 200,
+      "dur": 50,
+      "pid": 1,
+      "tid": 1,
+      "cat": "cpu_op"
+    },
+    {
+      "name": "aiu_randn_kernel",
+      "ph": "X",
+      "ts": 160,
+      "dur": 40,
+      "pid": 1,
+      "tid": 2,
+      "cat": "aiu"
+    },
+    {
+      "name": "aiu_matmul_kernel",
+      "ph": "X",
+      "ts": 220,
+      "dur": 30,
+      "pid": 1,
+      "tid": 2,
+      "cat": "privateuse1"
+    }
+  ]
+}

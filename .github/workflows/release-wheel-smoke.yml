@@ -1,0 +1,119 @@
+name: Release wheel smoke checks
+
+# Req 8.3: the smoke test executes automatically when a change is submitted to
+# the kineto-spyre release branch (push and pull_request targeting release/2.12),
+# and can be launched on demand via workflow_dispatch.
+on:
+  push:
+    branches: ['release/2.12']
+  pull_request:
+    branches: ['release/2.12']
+  workflow_dispatch:
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job A: GitHub-hosted automated validation that runs NOW, with no AIU
+  # hardware. Lints the build scripts, runs the trace-validator test suite,
+  # exercises the validator CLI against a committed golden trace, and
+  # byte-compiles the trace generator. This provides continuous validation
+  # while the self-hosted AIU runner (Job B) is unavailable.
+  # ---------------------------------------------------------------------------
+  checks:
+    name: Lint + validator checks (GitHub-hosted)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Lint build scripts (bash -n)
+        run: |
+          set -euo pipefail
+          for script in scripts/build_pytorch.sh scripts/build_lib.sh; do
+            if [ -f "$script" ]; then
+              echo "Checking syntax: $script"
+              bash -n "$script"
+            else
+              echo "NOTE: $script not present on this branch yet; skipping."
+            fi
+          done
+
+      - name: Install validator test dependencies
+        run: python -m pip install --upgrade pip hypothesis
+
+      - name: Run trace-validator test suite
+        run: |
+          set -euo pipefail
+          if [ -d tools/trace_validator/tests ]; then
+            python -m unittest discover -s tools/trace_validator/tests -t .
+          else
+            echo "NOTE: tools/trace_validator/tests not present on this branch yet; skipping."
+          fi
+
+      - name: Validate golden sample trace via the validator CLI
+        run: |
+          set -euo pipefail
+          sample=tools/trace_validator/tests/fixtures/sample_trace.json
+          if [ -f "$sample" ] && [ -d tools/trace_validator ]; then
+            # A valid golden trace must validate cleanly (exit 0).
+            python -m tools.trace_validator "$sample"
+          else
+            echo "NOTE: validator package or sample trace not present yet; skipping."
+          fi
+
+      - name: Byte-compile the trace generator
+        run: |
+          set -euo pipefail
+          if [ -f scripts/gen_trace.py ]; then
+            python -m py_compile scripts/gen_trace.py
+          else
+            echo "NOTE: scripts/gen_trace.py not present on this branch yet; skipping."
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Job B: the real release smoke test. Runs on a self-hosted AIU runner with
+  # libaiupti available. This is the end-to-end path (Req 8.1, 8.2, 8.6): it
+  # builds through the real release Build_Script so AIUPTI detection is
+  # genuinely exercised, generates a trace, and validates it. It idles until an
+  # admin registers a runner matching the [self-hosted, aiu] labels.
+  # ---------------------------------------------------------------------------
+  smoke-aiu:
+    name: Real build path smoke test (self-hosted AIU)
+    runs-on: [self-hosted, aiu]        # runner with libaiupti available
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      # Req 8.6 / 4.5: build through the real release path with
+      # LIBAIUPTI_INSTALL_DIR set so AIUPTI_Detection is exercised. A no-AIU
+      # build fails here (Req 8.4) instead of producing a misleading green run.
+      - name: Build wheel via the real release path
+        env:
+          LIBAIUPTI_INSTALL_DIR: ${{ env.LIBAIUPTI_INSTALL_DIR }}
+          VERIFY_SUBCOMPONENTS: "1"   # release path: enforce recorded subcomponent versions (Req 9.2-9.5)
+        run: ./scripts/build_pytorch.sh
+
+      # Req 8.1 (trace) / 8.4: if trace generation fails, this stage fails
+      # directly and the downstream validate step never runs.
+      - name: Install wheel and generate trace
+        run: |
+          set -euo pipefail
+          python3.12 -m pip install dist/*.whl
+          python3.12 scripts/gen_trace.py
+
+      # Req 8.2 / 8.5: assert >= 1 AIU event, no non-concurrent overlap, and
+      # AIU ts > 0 / dur > 0. The validator exits non-zero and names the failed
+      # assertion when any check fails.
+      - name: Validate trace
+        run: python3.12 -m tools.trace_validator trace.json
