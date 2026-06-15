@@ -113,6 +113,21 @@ function clone_pytorch() {
   mkdir -p $_SRC
   cd $_SRC
 
+  # Guard: PYTORCH_SRC must NOT live inside KINETO_DIR, otherwise the
+  # 'cp -r $KINETO_DIR third_party/kineto' below copies the fork tree into a
+  # subdirectory of itself ("cp: cannot copy a directory into itself").
+  _kdir_abs="$(cd "$_KINETO_DIR" && pwd -P)"
+  _src_abs="$(cd "$_SRC" && pwd -P)"
+  case "$_src_abs/" in
+    "$_kdir_abs"/*)
+      echo "ERROR: PYTORCH_SRC ('$_src_abs') is inside KINETO_DIR ('$_kdir_abs')." >&2
+      echo "       Set PYTORCH_SRC to a directory OUTSIDE the kineto-spyre checkout, e.g." >&2
+      echo "         export PYTORCH_SRC=\"\$(dirname \"$_kdir_abs\")/pt-build\"" >&2
+      echo "       remove any stray build dir inside the repo, then re-run." >&2
+      exit 1
+      ;;
+  esac
+
   # 4a. Fetch the pinned PyTorch 2.12 source when absent (Req 5.1).
   if [ ! -d "pytorch" ]; then
     echo "Cloning PyTorch $PYTORCH_VERSION..."
