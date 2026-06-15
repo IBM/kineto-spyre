@@ -77,25 +77,34 @@ cd kineto-spyre
 #   git submodule update --init --recursive
 
 # 2. Point the build at its inputs.
-export KINETO_DIR="$PWD"                     # this fork -> becomes third_party/kineto
-export PYTORCH_SRC="$PWD/_build"             # where PyTorch v2.12.0 is cloned/built
-export LIBAIUPTI_INSTALL_DIR=/path/to/libaiupti   # REQUIRED — AIUPTI detection gate
-export PYTHON_RELEASE_VERSION=3.12           # build a cp312 wheel
+export KINETO_DIR="$PWD"                          # this fork -> becomes third_party/kineto
+export PYTORCH_SRC="$(dirname "$PWD")/pt-build"   # build dir OUTSIDE the repo (must NOT be under KINETO_DIR)
+export LIBAIUPTI_INSTALL_DIR=/opt/ibm/spyre/runtime   # REQUIRED — prefix with lib/libaiupti.so + include/libaiupti
+export PYTHON_RELEASE_VERSION=3.12                # build a cp312 wheel
 
-# 3. (If using release_record.json) set the real libaiupti / aiu_toolkit versions
-#    so the build's subcomponent-version gate passes.
-
-# 4. Build the wheel. Clones PyTorch v2.12.0, swaps in this kineto fork, runs the
-#    version / PrivateUse1 / AIUPTI / subcomponent gates, and emits dist/*.whl.
+# 3. Build the wheel. Clones PyTorch v2.12.0, swaps in this kineto fork, runs the
+#    version / PrivateUse1 / AIUPTI gates, and emits dist/*.whl.
+#    The subcomponent-version gate is OFF for dev builds; the official release
+#    sets VERIFY_SUBCOMPONENTS=1 (and real versions in release_record.json).
 ./scripts/build_pytorch.sh
 
-# 5. Install the built wheel.
+# 4. Install the built wheel.
 pip install "$PYTORCH_SRC"/pytorch/dist/*.whl
 
-# 6. Generate a profiler trace over an AIU (PrivateUse1) workload and validate it.
+# 5. Generate a profiler trace over an AIU (PrivateUse1) workload and validate it.
 python scripts/gen_trace.py trace.json
 python -m tools.trace_validator trace.json   # expect: VALID (no violations)
 ```
+
+> **Common pitfalls**
+> - `PYTORCH_SRC` must be **outside** `KINETO_DIR`. If it is inside (e.g.
+>   `$PWD/_build`), the kineto swap fails with *"cp: cannot copy a directory
+>   into itself"*. The build now stops early with a clear message if so.
+> - `LIBAIUPTI_INSTALL_DIR` must be the real install prefix (the dir containing
+>   `lib/libaiupti.so` and `include/libaiupti/`), not a placeholder — otherwise
+>   the AIUPTI gate aborts the build (by design).
+> - Dev builds **skip** subcomponent version checks; set `VERIFY_SUBCOMPONENTS=1`
+>   only for an official release build.
 
 Hardware-independent checks (no AIU required) can be run anywhere with Python
 3.12:
