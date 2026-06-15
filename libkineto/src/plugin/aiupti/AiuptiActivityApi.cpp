@@ -21,7 +21,8 @@ AiuptiActivityApi& AiuptiActivityApi::singleton() {
   return instance;
 }
 
-void AiuptiActivityApi::pushCorrelationID(int id, CorrelationFlowType type) {
+void AiuptiActivityApi::pushCorrelationID([[maybe_unused]] int id,
+                                          CorrelationFlowType type) {
 #ifdef HAS_AIUPTI
   if (!singleton().externalCorrelationEnabled_) {
     return;
@@ -79,7 +80,8 @@ void AiuptiActivityApi::bufferRequestedTrampoline(
 void AiuptiActivityApi::bufferRequested(uint8_t **buffer, size_t *size,
                                         size_t *maxNumRecords) {
   std::lock_guard<std::mutex> guard(mutex_);
-  if (allocatedAiuTraceBuffers_.size() >= maxAiuBufferCount_) {
+  if (allocatedAiuTraceBuffers_.size() >=
+      static_cast<size_t>(maxAiuBufferCount_)) {
     stopCollection = true;
     LOG(WARNING) << "Exceeded max AIU buffer count ("
                  << allocatedAiuTraceBuffers_.size() << " > "
@@ -175,7 +177,8 @@ void AiuptiActivityApi::bufferCompletedTrampoline(
   singleton().bufferCompleted(buffer, size, validSize);
 }
 
-void AiuptiActivityApi::bufferCompleted(uint8_t *buffer, size_t size,
+void AiuptiActivityApi::bufferCompleted(uint8_t *buffer,
+                                        [[maybe_unused]] size_t size,
                                         size_t validSize) {
   std::lock_guard<std::mutex> guard(mutex_);
   auto& it = allocatedAiuTraceBuffers_.front();
