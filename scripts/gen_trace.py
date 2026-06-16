@@ -40,6 +40,37 @@ DEFAULT_OUTPUT = "trace.json"
 # The PrivateUse1 device backend name PyTorch exposes for AIU.
 PRIVATEUSE1_DEVICE = "privateuseone"
 
+# Python module that registers the AIU PrivateUse1 backend (and its profiler
+# activity) as a side effect of being imported. Overridable via the
+# AIU_BACKEND_MODULE environment variable for forks that ship the backend under
+# a different name. Set AIU_BACKEND_MODULE="" to skip the import entirely.
+DEFAULT_AIU_BACKEND_MODULE = "torch_sendnn"
+
+
+def _register_aiu_backend():
+    """Import the AIU backend module so it registers the PrivateUse1 device.
+
+    The AIU backend module (default ``torch_sendnn``) registers the
+    ``privateuseone`` device backend as a side effect of being imported, which
+    is what lets the workload below allocate device tensors. Importing torch
+    alone is not enough.
+
+    Returns ``True`` if the backend module was imported (or no module is
+    configured), ``False`` if it is configured but not installed. The caller
+    uses this to decide whether an AIU workload can run at all.
+    """
+    module_name = os.environ.get("AIU_BACKEND_MODULE", DEFAULT_AIU_BACKEND_MODULE)
+    if not module_name:
+        return True
+    try:
+        import importlib
+
+        importlib.import_module(module_name)
+        return True
+    except ImportError:
+        # Backend not installed; caller produces the actionable error.
+        return False
+
 
 def resolve_output_path(argv=None):
     """Resolve the trace output path from CLI args / env / default.
@@ -71,25 +102,52 @@ def generate_trace(output_path):
     import torch
     from torch.profiler import ProfilerActivity, profile
 
-    # Req 3.3 sanity check: PrivateUse1 must be a supported profiler activity.
-    # If it is not, the wheel was not built with PrivateUse1 profiler
-    # registration (PR #172154) and no AIU events could ever be emitted.
+    # The AIU backend module registers the ``privateuseone`` device as a side
+    # effect of being imported; importing torch alone is not enough. Do this
+    # before inspecting the profiler / running the workload.
+    backend_available = _register_aiu_backend()
+
+    # Two ways AIU (PrivateUse1) events can be captured:
+    #   1. Native: the wheel was built with PrivateUse1 profiler registration,
+    #      so ``ProfilerActivity.PrivateUse1`` is listed in
+    #      ``supported_activities()`` and can be passed to ``profile(...)``.
+    #   2. Fallback: the wheel lacks native registration, but the aiupti plugin
+    #      enables its AIU activity kinds whenever the ``ProfilerActivity``
+    #      environment variable is set to ``PrivateUse1`` (see
+    #      libkineto/src/plugin/aiupti/AiuptiActivityApi.cpp). In that mode we
+    #      profile with CPU only and the plugin attaches AIU events itself.
     supported = torch.profiler.supported_activities()
-    if not any("PrivateUse1" in str(activity) for activity in supported):
-        raise RuntimeError(
-            "PrivateUse1 is not in torch.profiler.supported_activities() "
-            "({}). The PyTorch wheel was not built with PrivateUse1 profiler "
-            "registration; AIU (PrivateUse1) profiling is unavailable.".format(
-                [str(a) for a in supported]
+    native_privateuse1 = any(
+        "PrivateUse1" in str(activity) for activity in supported
+    )
+
+    activities = [ProfilerActivity.CPU]
+    if native_privateuse1:
+        activities.append(ProfilerActivity.PrivateUse1)
+    else:
+        # Engage the aiupti env-var fallback so AIU activity kinds are enabled.
+        if os.environ.get("ProfilerActivity") != "PrivateUse1":
+            os.environ["ProfilerActivity"] = "PrivateUse1"
+        # Without the backend module there is no PrivateUse1 device to run on
+        # and no aiupti plugin to honor the fallback, so nothing could emit AIU
+        # events. Fail with an actionable message (Req 3.3).
+        if not backend_available:
+            module_name = os.environ.get(
+                "AIU_BACKEND_MODULE", DEFAULT_AIU_BACKEND_MODULE
             )
-        )
+            raise RuntimeError(
+                "PrivateUse1 is not in torch.profiler.supported_activities() "
+                "({}) and the AIU backend module {!r} is not importable. The "
+                "PyTorch wheel was not built with PrivateUse1 profiler "
+                "registration and no AIU backend is installed to provide the "
+                "ProfilerActivity=PrivateUse1 fallback; AIU profiling is "
+                "unavailable.".format([str(a) for a in supported], module_name)
+            )
 
     # Small PrivateUse1 (AIU) workload: a few matmuls on a device tensor so the
     # profiler records at least one AIU Trace_Event (Req 7.2).
     device = PRIVATEUSE1_DEVICE
-    with profile(
-        activities=[ProfilerActivity.CPU, ProfilerActivity.PrivateUse1]
-    ) as prof:
+    with profile(activities=activities) as prof:
         x = torch.randn(256, 256, device=device)
         for _ in range(10):
             x = x @ x
