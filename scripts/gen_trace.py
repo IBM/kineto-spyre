@@ -49,6 +49,13 @@ PRIVATEUSE1_DEVICE = "privateuseone"
 # a different name. Set AIU_BACKEND_MODULE="" to skip the import entirely.
 DEFAULT_AIU_BACKEND_MODULE = "torch_sendnn"
 
+# torch.compile backend used to dispatch the workload to AIU when no eager
+# PrivateUse1 device is registered (the torch_sendnn build is compile-only).
+# "sendnn" executes on AIU hardware; "sendnn_compile_only" compiles without
+# running and "sendnn_mock" is a mock, so neither would emit AIU runtime events.
+# Overridable via the AIU_COMPILE_BACKEND environment variable.
+DEFAULT_AIU_COMPILE_BACKEND = "sendnn"
+
 
 def _register_aiu_backend():
     """Import the AIU backend module so it registers the PrivateUse1 device.
@@ -100,6 +107,32 @@ def _privateuse1_device_name(torch):
         except Exception:
             pass
     return PRIVATEUSE1_DEVICE
+
+
+def _eager_device_available(torch, device):
+    """Return True if eager tensors can be allocated on ``device``.
+
+    The compile-only torch_sendnn build registers no eager PrivateUse1 device
+    module, so ``torch.empty(..., device="privateuseone")`` raises. We probe
+    once (outside the profiler) to decide between the eager and torch.compile
+    workloads. Any failure means eager allocation is unavailable.
+    """
+    try:
+        torch.empty(0, device=device)
+        return True
+    except Exception:
+        return False
+
+
+def _compile_backend_available(backend_name):
+    """Return True if ``backend_name`` is a registered torch.compile backend."""
+    try:
+        from torch._dynamo import list_backends
+
+        return backend_name in list_backends()
+    except Exception:
+        # Can't introspect; assume present and let torch.compile report errors.
+        return True
 
 
 def resolve_output_path(argv=None):
@@ -174,18 +207,47 @@ def generate_trace(output_path):
                 "unavailable.".format([str(a) for a in supported], module_name)
             )
 
-    # Small PrivateUse1 (AIU) workload: a few matmuls on a device tensor so the
-    # profiler records at least one AIU Trace_Event (Req 7.2). Resolve the
-    # actual PrivateUse1 device name (the AIU backend usually renames it).
+    # Resolve the PrivateUse1 device name and decide how to drive the AIU.
+    #   - eager: only works if the backend registered an eager PrivateUse1
+    #     device module (future native builds).
+    #   - compile: dispatch via torch.compile(..., backend="sendnn"), which is
+    #     how the compile-only torch_sendnn build executes on AIU hardware.
     device = _privateuse1_device_name(torch)
-    with profile(activities=activities) as prof:
-        x = torch.randn(256, 256, device=device)
+    use_eager = _eager_device_available(torch, device)
+    compile_backend = os.environ.get(
+        "AIU_COMPILE_BACKEND", DEFAULT_AIU_COMPILE_BACKEND
+    )
+    if not use_eager and not _compile_backend_available(compile_backend):
+        raise RuntimeError(
+            "No eager PrivateUse1 device is registered and the torch.compile "
+            "backend {!r} is not available. Install a torch_sendnn build that "
+            "registers an AIU execution backend, or set AIU_COMPILE_BACKEND to "
+            "a registered backend name.".format(compile_backend)
+        )
+
+    # Small AIU workload: a chain of matmuls so the profiler records at least
+    # one AIU Trace_Event (Req 7.2).
+    def _matmul_chain(t):
         for _ in range(10):
-            x = x @ x
-        # Ensure queued device work has completed before the trace is exported.
-        backend = getattr(torch, device, None)
-        if backend is not None and hasattr(backend, "synchronize"):
-            backend.synchronize()
+            t = t @ t
+        return t
+
+    with profile(activities=activities) as prof:
+        if use_eager:
+            x = torch.randn(256, 256, device=device)
+            x = _matmul_chain(x)
+            # Ensure queued device work completes before the trace is exported.
+            backend = getattr(torch, device, None)
+            if backend is not None and hasattr(backend, "synchronize"):
+                backend.synchronize()
+        else:
+            compiled = torch.compile(_matmul_chain, backend=compile_backend)
+            # CPU input tensor; the AIU compile backend handles device
+            # placement and execution. Materialize the result to force the
+            # compiled graph to run before the trace is exported.
+            out = compiled(torch.randn(256, 256))
+            if hasattr(out, "cpu"):
+                out = out.cpu()
 
     # Req 7.1: produce a Profiler_Trace as a Chrome-trace JSON file.
     prof.export_chrome_trace(output_path)
