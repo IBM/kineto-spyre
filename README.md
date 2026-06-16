@@ -74,11 +74,11 @@ with `libaiupti` installed.
 git clone --recurse-submodules https://github.com/IBM/kineto-spyre.git
 cd kineto-spyre
 # If you already cloned without --recurse-submodules:
-#   git submodule update --init --recursive
+# git submodule update --init --recursive
 
 # 2. Point the build at its inputs.
 export KINETO_DIR="$PWD"                          # this fork -> becomes third_party/kineto
-export PYTORCH_SRC="$(dirname "$PWD")/pt-build"   # build dir OUTSIDE the repo (must NOT be under KINETO_DIR)
+export PYTORCH_SRC="$(dirname "$PWD")/pt-build"   # build dir OUTSIDE the repo
 export LIBAIUPTI_INSTALL_DIR=/opt/ibm/spyre/runtime   # REQUIRED — prefix with lib/libaiupti.so + include/libaiupti
 export PYTHON_RELEASE_VERSION=3.12                # build a cp312 wheel
 
@@ -89,7 +89,7 @@ export PYTHON_RELEASE_VERSION=3.12                # build a cp312 wheel
 ./scripts/build_pytorch.sh
 
 # 4. Install the built wheel.
-pip install "$PYTORCH_SRC"/pytorch/dist/*.whl
+pip install --no-deps --force-reinstall --user $PYTORCH_SRC/pytorch/dist/*.whl
 
 # 5. Generate a profiler trace over an AIU (PrivateUse1) workload and validate it.
 python scripts/gen_trace.py trace.json
