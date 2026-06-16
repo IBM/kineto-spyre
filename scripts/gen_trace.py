@@ -83,6 +83,34 @@ def _resolve_sendnn_backend(module_name, pkg):
     return getattr(pkg, "sendnn_backend", None)
 
 
+class _AiuDeviceModule:
+    """Adapt the sendnn backend object to torch 2.12's device-module API.
+
+    The 2.11 e2e test registered ``torch_sendnn.sendnn_backend`` (a function) as
+    the PrivateUse1 device module. torch 2.12's ``torch.accelerator`` probes the
+    device module's ``is_available()`` (e.g. from dynamo's
+    ``SymbolicStreamState`` during ``torch.compile``), which a bare function
+    lacks -- raising ``AttributeError: 'function' object has no attribute
+    'is_available'``. This shim proxies every other attribute to the real
+    backend and supplies the accelerator-probe methods. ``is_available()``
+    returns ``False`` so dynamo skips stream tracking (AIU is not a CUDA-style
+    stream accelerator); AIU events are still captured by the aiupti plugin.
+    """
+
+    def __init__(self, backend):
+        self._backend = backend
+
+    def is_available(self):
+        return False
+
+    def device_count(self):
+        return 0
+
+    def __getattr__(self, name):
+        # Only reached for attributes not defined above; proxy to the backend.
+        return getattr(self._backend, name)
+
+
 def _register_aiu_backend(torch):
     """Register the AIU PrivateUse1 device the way the 2.11 e2e test does.
 
@@ -126,7 +154,9 @@ def _register_aiu_backend(torch):
     sendnn_backend = _resolve_sendnn_backend(module_name, pkg)
     if sendnn_backend is not None:
         try:
-            torch._register_device_module(device_name, sendnn_backend)
+            # Wrap in a shim so torch 2.12's torch.accelerator probing
+            # (mod.is_available()) does not crash on the bare backend function.
+            torch._register_device_module(device_name, _AiuDeviceModule(sendnn_backend))
         except Exception:
             pass
 
