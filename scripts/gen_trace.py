@@ -43,11 +43,16 @@ DEFAULT_OUTPUT = "trace.json"
 # the fallback when the renamed name cannot be queried.
 PRIVATEUSE1_DEVICE = "privateuseone"
 
-# Python module that registers the AIU PrivateUse1 backend (and its profiler
-# activity) as a side effect of being imported. Overridable via the
-# AIU_BACKEND_MODULE environment variable for forks that ship the backend under
-# a different name. Set AIU_BACKEND_MODULE="" to skip the import entirely.
+# Python module that registers the AIU PrivateUse1 backend as a side effect of
+# being imported. Overridable via the AIU_BACKEND_MODULE environment variable
+# for forks that ship the backend under a different name. Set
+# AIU_BACKEND_MODULE="" to skip the import/registration entirely.
 DEFAULT_AIU_BACKEND_MODULE = "torch_sendnn"
+
+# PrivateUse1 device name the AIU backend is renamed to (matches the 2.11 e2e
+# test, which calls rename_privateuse1_backend("aiu")). Overridable via the
+# AIU_DEVICE_NAME environment variable.
+DEFAULT_AIU_DEVICE_NAME = "aiu"
 
 # torch.compile backend used to dispatch the workload to AIU when no eager
 # PrivateUse1 device is registered (the torch_sendnn build is compile-only).
@@ -57,17 +62,41 @@ DEFAULT_AIU_BACKEND_MODULE = "torch_sendnn"
 DEFAULT_AIU_COMPILE_BACKEND = "sendnn"
 
 
-def _register_aiu_backend():
-    """Import the AIU backend module so it registers the PrivateUse1 device.
+def _resolve_sendnn_backend(module_name, pkg):
+    """Find the ``sendnn_backend`` device-module object to register.
 
-    The AIU backend module (default ``torch_sendnn``) registers the
-    ``privateuseone`` device backend as a side effect of being imported, which
-    is what lets the workload below allocate device tensors. Importing torch
-    alone is not enough.
+    Mirrors the 2.11 e2e test (``from torch_sendnn import torch_sendnn`` then
+    ``torch_sendnn.sendnn_backend``): look up ``sendnn_backend`` on the
+    ``<module_name>.<module_name>`` submodule first, then on the top-level
+    package.
+    """
+    import importlib
+
+    for candidate in (module_name + "." + module_name, module_name):
+        try:
+            mod = importlib.import_module(candidate)
+        except Exception:
+            continue
+        backend = getattr(mod, "sendnn_backend", None)
+        if backend is not None:
+            return backend
+    return getattr(pkg, "sendnn_backend", None)
+
+
+def _register_aiu_backend(torch):
+    """Register the AIU PrivateUse1 device the way the 2.11 e2e test does.
+
+    Importing the AIU backend module (default ``torch_sendnn``) is not, on its
+    own, enough to expose PrivateUse1 to the profiler on this build. The 2.11
+    benchmark (``e2e_tests/pt2bench/bert/z-script/llm-program.py``) performs an
+    explicit registration sequence, which we replicate here::
+
+        torch.utils.rename_privateuse1_backend("aiu")
+        torch._register_device_module("aiu", torch_sendnn.sendnn_backend)
+        torch.utils.generate_methods_for_privateuse1_backend()
 
     Returns ``True`` if the backend module was imported (or no module is
-    configured), ``False`` if it is configured but not installed. The caller
-    uses this to decide whether an AIU workload can run at all.
+    configured), ``False`` if it is configured but not installed.
     """
     module_name = os.environ.get("AIU_BACKEND_MODULE", DEFAULT_AIU_BACKEND_MODULE)
     if not module_name:
@@ -75,11 +104,38 @@ def _register_aiu_backend():
     try:
         import importlib
 
-        importlib.import_module(module_name)
-        return True
+        pkg = importlib.import_module(module_name)
     except ImportError:
         # Backend not installed; caller produces the actionable error.
         return False
+
+    device_name = os.environ.get("AIU_DEVICE_NAME", DEFAULT_AIU_DEVICE_NAME)
+
+    # rename_privateuse1_backend can only be set once per process; skip if the
+    # backend is already named what we want.
+    try:
+        current = torch._C._get_privateuse1_backend_name()
+    except Exception:
+        current = None
+    if current != device_name:
+        try:
+            torch.utils.rename_privateuse1_backend(device_name)
+        except Exception:
+            pass
+
+    sendnn_backend = _resolve_sendnn_backend(module_name, pkg)
+    if sendnn_backend is not None:
+        try:
+            torch._register_device_module(device_name, sendnn_backend)
+        except Exception:
+            pass
+
+    try:
+        torch.utils.generate_methods_for_privateuse1_backend()
+    except Exception:
+        pass
+
+    return True
 
 
 def _privateuse1_device_name(torch):
@@ -165,10 +221,11 @@ def generate_trace(output_path):
     import torch
     from torch.profiler import ProfilerActivity, profile
 
-    # The AIU backend module registers the ``privateuseone`` device as a side
-    # effect of being imported; importing torch alone is not enough. Do this
-    # before inspecting the profiler / running the workload.
-    backend_available = _register_aiu_backend()
+    # Register the AIU PrivateUse1 device using the 2.11 e2e sequence
+    # (rename_privateuse1_backend -> _register_device_module ->
+    # generate_methods_for_privateuse1_backend). This is what exposes
+    # PrivateUse1 to the profiler; importing torch alone is not enough.
+    backend_available = _register_aiu_backend(torch)
 
     # Two ways AIU (PrivateUse1) events can be captured:
     #   1. Native: the wheel was built with PrivateUse1 profiler registration,
