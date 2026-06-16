@@ -37,7 +37,10 @@ import sys
 # CLI argument or the GEN_TRACE_OUTPUT environment variable.
 DEFAULT_OUTPUT = "trace.json"
 
-# The PrivateUse1 device backend name PyTorch exposes for AIU.
+# Default PyTorch device type for the PrivateUse1 backend. The AIU backend
+# usually renames this (e.g. to "aiu") via rename_privateuse1_backend(); the
+# actual name is resolved at runtime by _privateuse1_device_name(). This is only
+# the fallback when the renamed name cannot be queried.
 PRIVATEUSE1_DEVICE = "privateuseone"
 
 # Python module that registers the AIU PrivateUse1 backend (and its profiler
@@ -70,6 +73,33 @@ def _register_aiu_backend():
     except ImportError:
         # Backend not installed; caller produces the actionable error.
         return False
+
+
+def _privateuse1_device_name(torch):
+    """Return the PyTorch device string for the PrivateUse1 (AIU) backend.
+
+    The AIU backend module typically renames PrivateUse1 to a custom name (for
+    example ``aiu``) via ``torch.utils.rename_privateuse1_backend``. After a
+    rename, ``device="privateuseone"`` no longer resolves, so the workload must
+    use the renamed name. Resolution order:
+
+      1. ``AIU_DEVICE_NAME`` environment variable (explicit override).
+      2. ``torch._C._get_privateuse1_backend_name()`` (the name the backend
+         registered).
+      3. ``PRIVATEUSE1_DEVICE`` default (``privateuseone``).
+    """
+    override = os.environ.get("AIU_DEVICE_NAME")
+    if override:
+        return override
+    getter = getattr(getattr(torch, "_C", None), "_get_privateuse1_backend_name", None)
+    if getter is not None:
+        try:
+            name = getter()
+            if name:
+                return name
+        except Exception:
+            pass
+    return PRIVATEUSE1_DEVICE
 
 
 def resolve_output_path(argv=None):
@@ -145,17 +175,17 @@ def generate_trace(output_path):
             )
 
     # Small PrivateUse1 (AIU) workload: a few matmuls on a device tensor so the
-    # profiler records at least one AIU Trace_Event (Req 7.2).
-    device = PRIVATEUSE1_DEVICE
+    # profiler records at least one AIU Trace_Event (Req 7.2). Resolve the
+    # actual PrivateUse1 device name (the AIU backend usually renames it).
+    device = _privateuse1_device_name(torch)
     with profile(activities=activities) as prof:
         x = torch.randn(256, 256, device=device)
         for _ in range(10):
             x = x @ x
         # Ensure queued device work has completed before the trace is exported.
-        if hasattr(torch, PRIVATEUSE1_DEVICE):
-            backend = getattr(torch, PRIVATEUSE1_DEVICE)
-            if hasattr(backend, "synchronize"):
-                backend.synchronize()
+        backend = getattr(torch, device, None)
+        if backend is not None and hasattr(backend, "synchronize"):
+            backend.synchronize()
 
     # Req 7.1: produce a Profiler_Trace as a Chrome-trace JSON file.
     prof.export_chrome_trace(output_path)
