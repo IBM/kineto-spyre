@@ -11,6 +11,45 @@
 
 Full provenance is in the committed `release_record.json`.
 
+## Known issues / release blockers
+
+### AIU trace generation requires a torch-2.12-compatible `torch_sendnn` (BLOCKER)
+
+The trace-generation step (`scripts/gen_trace.py` → `tools/trace_validator`,
+Req 3.3 / 7.1 / 7.2) cannot produce an AIU trace until a `torch_sendnn` build
+that supports PyTorch 2.12 is available. The kineto-spyre wheel builds and the
+profiler/aiupti plumbing is correct; the gap is entirely in the `torch_sendnn`
+backend:
+
+- **No eager AIU device.** `torch_sendnn` registers no eager PrivateUse1 device
+  module (`torch._C._get_privateuse1_backend_name()` → `privateuseone`, default;
+  `torch.randn(device="privateuseone")` raises
+  `ModuleNotFoundError: No module named 'torch.privateuseone'`). AIU work must go
+  through `torch.compile`.
+- **`sendnn` compile backend is incompatible with torch 2.12.**
+  `torch.compile(fn, backend="sendnn")` fails during AOTAutograd with
+  `AttributeError: 'ViewAndMutationMeta' object has no attribute 'is_train'`
+  (`torch_sendnn/backends/sendnn_backend.py:76`). The `is_train` field on
+  AOTAutograd's `ViewAndMutationMeta` was removed/renamed in PyTorch 2.12, so the
+  backend cannot compile.
+- **The only versioned `torch_sendnn` pins old torch.** `torch_sendnn 1.2.2+0`
+  requires `torch<=2.10.0,>=2.5.1`, incompatible with the
+  `torch-2.12.0+aiu.kineto.1.2.0` wheel. The locally built `torch_sendnn 0.0.0`
+  is the only torch-2.12-installable build, and it hits the `is_train` failure
+  above.
+
+**Resolution needed:** a `torch_sendnn` release updated for the PyTorch 2.12
+AOTAutograd API (and, ideally, native PrivateUse1 profiler registration). Until
+then, `gen_trace.py` can only be exercised end-to-end against AIU hardware with a
+compatible backend; `AIU_COMPILE_BACKEND=sendnn_mock` can confirm the
+profiler/validator plumbing but does not produce real AIU hardware events.
+
+`gen_trace.py` already accommodates a future fixed backend: it auto-detects an
+eager PrivateUse1 device, honors `AIU_DEVICE_NAME`, falls back to
+`torch.compile` with `AIU_COMPILE_BACKEND` (default `sendnn`), and engages the
+aiupti `ProfilerActivity=PrivateUse1` env-var fallback when the wheel lacks
+native PrivateUse1 profiler registration.
+
 ## API changes (from the upstream kineto sync)
 
 These public-header changes come from the integrated upstream commits
