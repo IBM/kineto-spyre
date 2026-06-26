@@ -158,6 +158,7 @@ function build_pytorch() {
   else
     echo "Detected $ARCH — building with OpenBLAS..."
     export USE_MKL=0
+    export USE_MKLDNN=0
     export BLAS=OpenBLAS
   fi
 
@@ -186,7 +187,7 @@ function build_pytorch() {
     cp $CONDA_PREFIX/lib/libomp* build/lib.linux-$ARCH-cpython-${PYTHON_MAJOR}${PYTHON_MINOR}/torch/lib/
   fi
 
-  python3 setup.py bdist_wheel --python-tag "$PYTHON_TAG" --verbose 2>&1 | tee -a build.log
+  python3 setup.py bdist_wheel --python-tag "$PYTHON_TAG" --plat-name manylinux_2_28_$ARCH --verbose 2>&1 | tee -a build.log
 
   echo "Build complete. Wheel is in: pytorch/dist/"
   cd ..
