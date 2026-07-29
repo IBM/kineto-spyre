@@ -2,6 +2,7 @@
 
 #include <aiupti_runtime_cbid.h>
 
+#include <cstdint>
 #include <string>
 
 namespace KINETO_NAMESPACE {
@@ -310,11 +311,11 @@ inline uint32_t getBaseResourceId(const AIUpti_ActivityMemcpy* activity) {
   return activity->copy_kind * 100;
 }
 
-inline uint32_t getBaseResourceId(const AIUpti_ActivityMemory* activity) {
+inline uint32_t getBaseResourceId([[maybe_unused]] const AIUpti_ActivityMemory* activity) {
   return 400;
 }
 
-inline uint32_t getBaseResourceId(const AIUpti_ActivityMemset* activity) {
+inline uint32_t getBaseResourceId([[maybe_unused]] const AIUpti_ActivityMemset* activity) {
   return 400; // put memset and memory release on the same PID
 }
 
@@ -328,8 +329,8 @@ uint32_t AiuptiActivityProfilerSession::getResourceId(
   if (it != activeThreadMap_.end()) {
     std::vector<int64_t>& last_active_times = (*it).second;
     bool found_useable_thread = false;
-    for (auto i = 0; i < last_active_times.size(); ++i) {
-      if (last_active_times[i] <= activity->start) {
+    for (uint64_t i = 0; i < last_active_times.size(); ++i) {
+      if (last_active_times[i] <= static_cast<int64_t>(activity->start)) {
         found_useable_thread = true;
         overlap_offset = i;
         last_active_times[i] = activity->end;
@@ -343,7 +344,7 @@ uint32_t AiuptiActivityProfilerSession::getResourceId(
     activeThreadMap_[{activity->device_id, base_resource_id}][overlap_offset] =
         activity->end;
   } else {
-    activeThreadMap_[{activity->device_id, base_resource_id}] = {activity->end};
+    activeThreadMap_[{activity->device_id, base_resource_id}] = {static_cast<int64_t>(activity->end)};
   }
   return base_resource_id + overlap_offset;
 }
@@ -387,7 +388,7 @@ void AiuptiActivityProfilerSession::handleMemcpyActivity(
   memcpy_activity->addMetadata("bytes", activity->bytes);
   memcpy_activity->addMetadata("memory bandwidth (GB/s)", bandwidth(activity));
 
-  if (memcpy_activity->resource == getBaseResourceId(activity)) {
+  if (static_cast<uint32_t>(memcpy_activity->resource) == getBaseResourceId(activity)) {
     recordMemoryStream(
         memcpy_activity->device,
         memcpy_activity->resource,
@@ -464,7 +465,7 @@ void AiuptiActivityProfilerSession::handleMemoryActivity(
     mem_activity->addMetadata("bytes", activity->bytes);
     mem_activity->addMetadata("memory bandwidth (GB/s)", bandwidth(activity));
 
-    if (mem_activity->resource == getBaseResourceId(activity)) {
+    if (static_cast<uint32_t>(mem_activity->resource) == getBaseResourceId(activity)) {
       recordMemoryStream(
           mem_activity->device, mem_activity->resource, "Memory management:");
     } else {
@@ -599,7 +600,7 @@ void AiuptiActivityProfilerSession::handleMemsetActivity(
   memset_activity->addMetadata("bytes", activity->bytes);
   memset_activity->addMetadata("memory bandwidth (GB/s)", bandwidth(activity));
 
-  if (memset_activity->resource == getBaseResourceId(activity)) {
+  if (static_cast<uint32_t>(memset_activity->resource) == getBaseResourceId(activity)) {
     recordMemoryStream(
         memset_activity->device,
         memset_activity->resource,

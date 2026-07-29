@@ -24,7 +24,7 @@ class AiuptiActivityApi {
 
   static AiuptiActivityApi& singleton();
 
-  static void pushCorrelationID(int id, CorrelationFlowType type);
+  static void pushCorrelationID([[maybe_unused]] int id, CorrelationFlowType type);
   static void popCorrelationID(CorrelationFlowType type);
 
   void enableAiuptiActivities(const std::set<ActivityType>& selected_activities);
@@ -58,7 +58,7 @@ class AiuptiActivityApi {
 
  protected:
   void bufferRequested(uint8_t** buffer, size_t* size, size_t* maxNumRecords);
-  void bufferCompleted(uint8_t* buffer, size_t size, size_t validSize);
+  void bufferCompleted(uint8_t* buffer, [[maybe_unused]] size_t size, size_t validSize);
 };
 
 } // namespace KINETO_NAMESPACE
