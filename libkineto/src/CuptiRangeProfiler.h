@@ -24,6 +24,12 @@
 
 namespace KINETO_NAMESPACE {
 
+#if defined(HAS_CUPTI_RANGE_PROFILER)
+constexpr bool kHasCuptiRangeProfiler = true;
+#else
+constexpr bool kHasCuptiRangeProfiler = false;
+#endif
+
 using CuptiProfilerPrePostCallback = std::function<void(void)>;
 
 /* Activity Profiler session encapsulates the CUPTI Range based Profiler
@@ -31,9 +37,7 @@ using CuptiProfilerPrePostCallback = std::function<void(void)>;
  */
 class CuptiRangeProfilerSession : public IActivityProfilerSession {
  public:
-  explicit CuptiRangeProfilerSession(
-      const Config& config,
-      ICuptiRBProfilerSessionFactory& factory);
+  explicit CuptiRangeProfilerSession(const Config& config, ICuptiRBProfilerSessionFactory& factory);
 
   ~CuptiRangeProfilerSession() override {}
 
@@ -60,9 +64,7 @@ class CuptiRangeProfilerSession : public IActivityProfilerSession {
   std::vector<ResourceInfo> getResourceInfos() override;
 
  private:
-  void addRangeEvents(
-      const CuptiProfilerResult& result,
-      const CuptiRBProfilerSession* profiler);
+  void addRangeEvents(const CuptiProfilerResult& result, const CuptiRBProfilerSession* profiler);
 
   CUpti_ProfilerRange rangeType_ = CUPTI_UserRange;
   CUpti_ProfilerReplayMode replayType_ = CUPTI_UserReplay;

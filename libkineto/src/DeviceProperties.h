@@ -12,6 +12,7 @@
 #include <string>
 
 #ifdef HAS_CUPTI
+#include <cuda_occupancy.h>
 #include <cupti.h>
 #endif
 
@@ -24,20 +25,32 @@ int smCount(uint32_t deviceId);
 
 // TODO: Implement the below for HAS_ROCTRACER
 #ifdef HAS_CUPTI
-float blocksPerSm(const CUpti_ActivityKernel4& kernel);
-float warpsPerSm(const CUpti_ActivityKernel4& kernel);
 
-// Return estimated achieved occupancy for a kernel
-float kernelOccupancy(const CUpti_ActivityKernel4& kernel);
-float kernelOccupancy(
-    uint32_t deviceId,
-    uint16_t registersPerThread,
-    int32_t staticSharedMemory,
-    int32_t dynamicSharedMemory,
-    int32_t blockX,
-    int32_t blockY,
-    int32_t blockZ,
-    float blocks_per_sm);
+// Use newer CUPTI activity structs in CUDA 12.0+ for extended fields
+#if defined(CUDA_VERSION) && CUDA_VERSION >= 12000
+using CUpti_ActivityKernelType = CUpti_ActivityKernel9;
+using CUpti_ActivityMemcpyType = CUpti_ActivityMemcpy5;
+using CUpti_ActivityMemcpyPtoPType = CUpti_ActivityMemcpyPtoP4;
+using CUpti_ActivityMemsetType = CUpti_ActivityMemset4;
+#else
+using CUpti_ActivityKernelType = CUpti_ActivityKernel4;
+using CUpti_ActivityMemcpyType = CUpti_ActivityMemcpy;
+using CUpti_ActivityMemcpyPtoPType = CUpti_ActivityMemcpy2;
+using CUpti_ActivityMemsetType = CUpti_ActivityMemset;
+#endif
+
+float blocksPerSm(const CUpti_ActivityKernelType& kernel);
+float warpsPerSm(const CUpti_ActivityKernelType& kernel);
+
+// Occupancy results from CUDA occupancy calculator
+// Returns cudaOccResult from cuda_occupancy.h plus a computed occupancy metric
+struct OccupancyMetrics {
+  float occupancy = -1.0f; // Computed effective occupancy in number of threads
+  cudaOccResult result = {}; // Raw results from cudaOccMaxActiveBlocksPerMultiprocessor
+};
+
+// Return detailed occupancy metrics including limiting factors
+OccupancyMetrics computeOccupancyMetrics(const CUpti_ActivityKernelType& kernel);
 #endif
 
 } // namespace KINETO_NAMESPACE

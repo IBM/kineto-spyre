@@ -137,8 +137,10 @@ const std::vector<std::string> kCudaRuntimeNames = {
 };
 
 // Generate activities with realistic data
-std::vector<GenericTraceActivity>
-generateActivities(const TraceSpan& span, size_t count, std::mt19937& rng) {
+std::vector<GenericTraceActivity> generateActivities(
+    const TraceSpan& span,
+    size_t count,
+    std::mt19937& rng) {
   std::vector<GenericTraceActivity> activities;
   activities.reserve(count);
 

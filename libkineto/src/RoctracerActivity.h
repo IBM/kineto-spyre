@@ -36,8 +36,7 @@ struct TraceSpan;
 // Abstract base class, templated on Roctracer activity type
 template <class T>
 struct RoctracerActivity : public ITraceActivity {
-  explicit RoctracerActivity(const T* activity, const ITraceActivity* linked)
-      : activity_(*activity), linked_(linked) {}
+  explicit RoctracerActivity(const T* activity, const ITraceActivity* linked) : activity_(*activity), linked_(linked) {}
   // Our stored timestamps (from roctracer and generated) are in CLOCK_MONOTONIC
   // domain (in ns). Convert the timestamps.
   int64_t timestamp() const override {
@@ -81,11 +80,9 @@ struct RoctracerActivity : public ITraceActivity {
   std::unordered_map<std::string, std::string> metadata_;
 };
 
-// roctracerAsyncRow - Roctracer GPU activities
-struct GpuActivity : public RoctracerActivity<roctracerAsyncRow> {
-  explicit GpuActivity(
-      const roctracerAsyncRow* activity,
-      const ITraceActivity* linked)
+// rocprofAsyncRow - Roctracer GPU activities
+struct GpuActivity : public RoctracerActivity<rocprofAsyncRow> {
+  explicit GpuActivity(const rocprofAsyncRow* activity, const ITraceActivity* linked)
       : RoctracerActivity(activity, linked) {
     switch (activity_.kind) {
       case HIP_OP_COPY_KIND_DEVICE_TO_HOST_:
@@ -143,8 +140,7 @@ struct GpuActivity : public RoctracerActivity<roctracerAsyncRow> {
 // Roctracer runtime activities
 template <class T>
 struct RuntimeActivity : public RoctracerActivity<T> {
-  explicit RuntimeActivity(const T* activity, const ITraceActivity* linked)
-      : RoctracerActivity<T>(activity, linked) {}
+  explicit RuntimeActivity(const T* activity, const ITraceActivity* linked) : RoctracerActivity<T>(activity, linked) {}
   int64_t correlationId() const override {
     return raw().id;
   }
@@ -159,8 +155,7 @@ struct RuntimeActivity : public RoctracerActivity<T> {
   }
   bool flowStart() const override;
   const std::string name() const override {
-    return std::string(
-        roctracer_op_string(ACTIVITY_DOMAIN_HIP_API, raw().cid, 0));
+    return std::string(roctracer_op_string(ACTIVITY_DOMAIN_HIP_API, raw().cid, 0));
   }
   void log(ActivityLogger& logger) const override;
   const std::string metadataJson() const override;

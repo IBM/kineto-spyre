@@ -48,12 +48,10 @@ class RoctracerActivityApi {
   void setMaxEvents(uint32_t maxEvents);
 
   virtual int processActivities(
-      std::function<void(const roctracerBase*)> handler,
-      std::function<
-          void(uint64_t, uint64_t, RoctracerLogger::CorrelationDomain)>
-          correlationHandler);
+      std::function<void(const rocprofBase*)> handler,
+      std::function<void(uint64_t, uint64_t, RocLogger::CorrelationDomain)> correlationHandler);
 
-  void setMaxBufferSize(int size);
+  void setMaxBufferSize(int64_t size);
 
   std::atomic_bool stopCollection{false};
 

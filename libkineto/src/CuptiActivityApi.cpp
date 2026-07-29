@@ -26,7 +26,6 @@ namespace KINETO_NAMESPACE {
 // case, there will be 32 buffers contending for the mutex.
 constexpr size_t kBufSize(4 * 1024 * 1024);
 
-#ifdef HAS_CUPTI
 inline bool cuptiTearDown_() {
   auto teardown_env = getenv("TEARDOWN_CUPTI");
   return teardown_env != nullptr && strcmp(teardown_env, "1") == 0;
@@ -36,16 +35,14 @@ inline bool cuptiLazyInit_() {
   return cuptiTearDown_() && getenv("DISABLE_CUPTI_LAZY_REINIT") == nullptr;
 }
 
-inline void reenableCuptiCallbacks_(std::shared_ptr<CuptiCallbackApi>& cbapi_) {
+inline void reenableCuptiCallbacks_(CuptiCallbackApi& cbapi) {
   // Re-enable callbacks from the past if they exist.
   LOG(INFO) << "Re-enable previous CUPTI callbacks - Starting";
-  VLOG(1) << "  CUPTI subscriber before reinit:"
-          << cbapi_->getCuptiSubscriber();
-  cbapi_->initCallbackApi();
-  if (cbapi_->initSuccess()) {
-    VLOG(1) << "  CUPTI subscriber after reinit:"
-            << cbapi_->getCuptiSubscriber();
-    bool status = cbapi_->reenableCallbacks();
+  VLOG(1) << "  CUPTI subscriber before reinit:" << cbapi.getCuptiSubscriber();
+  cbapi.initCallbackApi();
+  if (cbapi.initSuccess()) {
+    VLOG(1) << "  CUPTI subscriber after reinit:" << cbapi.getCuptiSubscriber();
+    bool status = cbapi.reenableCallbacks();
     if (!status) {
       LOG(WARNING)
           << "Re-enable previous CUPTI callbacks - Failed to reenableCallbacks";
@@ -57,15 +54,13 @@ inline void reenableCuptiCallbacks_(std::shared_ptr<CuptiCallbackApi>& cbapi_) {
         << "Re-enable previous CUPTI callbacks - Failed to initCallbackApi";
   }
 }
-#endif
 
 CuptiActivityApi& CuptiActivityApi::singleton() {
-  static CuptiActivityApi instance;
-  return instance;
+  static auto* instance = new CuptiActivityApi();
+  return *instance;
 }
 
 void CuptiActivityApi::pushCorrelationID(int id, CorrelationFlowType type) {
-#ifdef HAS_CUPTI
   if (!singleton().externalCorrelationEnabled_) {
     return;
   }
@@ -79,11 +74,9 @@ void CuptiActivityApi::pushCorrelationID(int id, CorrelationFlowType type) {
       CUPTI_CALL(cuptiActivityPushExternalCorrelationId(
           CUPTI_EXTERNAL_CORRELATION_KIND_CUSTOM1, id));
   }
-#endif
 }
 
 void CuptiActivityApi::popCorrelationID(CorrelationFlowType type) {
-#ifdef HAS_CUPTI
   if (!singleton().externalCorrelationEnabled_) {
     return;
   }
@@ -96,14 +89,12 @@ void CuptiActivityApi::popCorrelationID(CorrelationFlowType type) {
       CUPTI_CALL(cuptiActivityPopExternalCorrelationId(
           CUPTI_EXTERNAL_CORRELATION_KIND_CUSTOM1, nullptr));
   }
-#endif
 }
 
 static bool nextActivityRecord(
     uint8_t* buffer,
     size_t valid_size,
     CUpti_Activity*& record) {
-#ifdef HAS_CUPTI
   CUptiResult status = CUPTI_CALL_NOWARN(
       cuptiActivityGetNextRecord(buffer, valid_size, &record));
   if (status != CUPTI_SUCCESS) {
@@ -112,45 +103,35 @@ static bool nextActivityRecord(
     }
     record = nullptr;
   }
-#endif
   return record != nullptr;
 }
 
-void CuptiActivityApi::setMaxBufferSize(int size) {
+void CuptiActivityApi::setMaxBufferSize(int64_t size) {
   maxGpuBufferCount_ = 1 + size / kBufSize;
 }
 
 void CuptiActivityApi::setDeviceBufferSize(size_t size) {
-#ifdef HAS_CUPTI
   size_t valueSize = sizeof(size_t);
   CUPTI_CALL(cuptiActivitySetAttribute(
       CUPTI_ACTIVITY_ATTR_DEVICE_BUFFER_SIZE, &valueSize, &size));
-#endif
 }
 
 void CuptiActivityApi::setDeviceBufferPoolLimit(size_t limit) {
-#ifdef HAS_CUPTI
   size_t valueSize = sizeof(size_t);
   CUPTI_CALL(cuptiActivitySetAttribute(
       CUPTI_ACTIVITY_ATTR_DEVICE_BUFFER_POOL_LIMIT, &valueSize, &limit));
-#endif
 }
 
 void CuptiActivityApi::forceLoadCupti() {
-#ifdef HAS_CUPTI
   CUPTI_CALL(cuptiActivityEnable(CUPTI_ACTIVITY_KIND_CONCURRENT_KERNEL));
-#endif
 }
 
 void CuptiActivityApi::preConfigureCUPTI() {
-#ifdef HAS_CUPTI
   if (!isGpuAvailable()) {
     return;
   }
-#endif
 }
 
-#ifdef HAS_CUPTI
 void CUPTIAPI CuptiActivityApi::bufferRequestedTrampoline(
     uint8_t** buffer,
     size_t* size,
@@ -164,7 +145,8 @@ void CuptiActivityApi::bufferRequested(
     size_t* maxNumRecords) {
   std::lock_guard<std::mutex> guard(mutex_);
   LOG(VERBOSE) << "CUPTI buffer requested";
-  if (allocatedGpuTraceBuffers_.size() >= maxGpuBufferCount_) {
+  if (static_cast<int64_t>(allocatedGpuTraceBuffers_.size()) >=
+      maxGpuBufferCount_) {
     stopCollection = true;
     LOG(WARNING) << "Exceeded max GPU buffer count ("
                  << allocatedGpuTraceBuffers_.size()
@@ -179,7 +161,6 @@ void CuptiActivityApi::bufferRequested(
 
   *maxNumRecords = 0;
 }
-#endif
 
 std::unique_ptr<CuptiActivityBufferMap> CuptiActivityApi::activityBuffers() {
   {
@@ -189,7 +170,6 @@ std::unique_ptr<CuptiActivityBufferMap> CuptiActivityApi::activityBuffers() {
     }
   }
 
-#ifdef HAS_CUPTI
   VLOG(1) << "Flushing GPU activity buffers";
   time_point<system_clock> t1;
   if (VLOG_IS_ON(1)) {
@@ -211,13 +191,11 @@ std::unique_ptr<CuptiActivityBufferMap> CuptiActivityApi::activityBuffers() {
   CUPTI_CALL(cuptiActivitySetAttribute(
       CUPTI_ACTIVITY_ATTR_PER_THREAD_ACTIVITY_BUFFER, &sizeof_value, &value));
 #endif // (CUDART_VERSION >= 12030)
-#endif
   std::lock_guard<std::mutex> guard(mutex_);
   // Transfer ownership of buffers to caller. A new map is created on-demand.
   return std::move(readyGpuTraceBuffers_);
 }
 
-#ifdef HAS_CUPTI
 int CuptiActivityApi::processActivitiesForBuffer(
     uint8_t* buf,
     size_t validSize,
@@ -232,27 +210,22 @@ int CuptiActivityApi::processActivitiesForBuffer(
   }
   return count;
 }
-#endif
 
 const std::pair<int, size_t> CuptiActivityApi::processActivities(
     CuptiActivityBufferMap& buffers,
     const std::function<void(const CUpti_Activity*)>& handler) {
   std::pair<int, size_t> res{0, 0};
-#ifdef HAS_CUPTI
   for (auto& pair : buffers) {
     // No lock needed - only accessed from this thread
     auto& buf = pair.second;
     res.first += processActivitiesForBuffer(buf->data(), buf->size(), handler);
     res.second += buf->size();
   }
-#endif
   return res;
 }
 
 void CuptiActivityApi::flushActivities() {
-#ifdef HAS_CUPTI
   CUPTI_CALL(cuptiActivityFlushAll(0));
-#endif
 }
 
 void CuptiActivityApi::clearActivities() {
@@ -264,9 +237,7 @@ void CuptiActivityApi::clearActivities() {
   }
   // Can't hold mutex_ during this call, since bufferCompleted
   // will be called by libcupti and mutex_ is acquired there.
-#ifdef HAS_CUPTI
   CUPTI_CALL(cuptiActivityFlushAll(0));
-#endif
   // FIXME: We might want to make sure we reuse
   // the same memory during warmup and tracing.
   // Also, try to use the amount of memory required
@@ -276,7 +247,6 @@ void CuptiActivityApi::clearActivities() {
   readyGpuTraceBuffers_ = nullptr;
 }
 
-#ifdef HAS_CUPTI
 void CUPTIAPI CuptiActivityApi::bufferCompletedTrampoline(
     CUcontext ctx,
     uint32_t streamId,
@@ -292,25 +262,32 @@ void CuptiActivityApi::bufferCompleted(
     uint8_t* buffer,
     size_t /* unused */,
     size_t validSize) {
-  std::lock_guard<std::mutex> guard(mutex_);
-  auto it = allocatedGpuTraceBuffers_.find(buffer);
-  if (it == allocatedGpuTraceBuffers_.end()) {
-    LOG(ERROR) << "bufferCompleted called with unknown buffer: "
-               << (void*)buffer;
-    return;
-  }
+  {
+    std::lock_guard<std::mutex> guard(mutex_);
+    auto it = allocatedGpuTraceBuffers_.find(buffer);
+    if (it == allocatedGpuTraceBuffers_.end()) {
+      LOG(ERROR) << "bufferCompleted called with unknown buffer: "
+                 << static_cast<void*>(buffer);
+      return;
+    }
 
-  if (!readyGpuTraceBuffers_) {
-    readyGpuTraceBuffers_ = std::make_unique<CuptiActivityBufferMap>();
+    if (!readyGpuTraceBuffers_) {
+      readyGpuTraceBuffers_ = std::make_unique<CuptiActivityBufferMap>();
+    }
+    // Set valid size of buffer before moving to ready map
+    it->second->setSize(validSize);
+    (*readyGpuTraceBuffers_)[it->first] = std::move(it->second);
+    allocatedGpuTraceBuffers_.erase(it);
   }
-  // Set valid size of buffer before moving to ready map
-  it->second->setSize(validSize);
-  (*readyGpuTraceBuffers_)[it->first] = std::move(it->second);
-  allocatedGpuTraceBuffers_.erase(it);
 
   // report any records dropped from the queue; to avoid unnecessary cupti
   // API calls, we make it report only in verbose mode (it doesn't happen
   // often in our testing anyways)
+  // Can't hold mutex_ during this call, since cuptiActivityGetNumDroppedRecords
+  // re-enters CUPTI and can acquire CUPTI's internal lock, while CUPTI
+  // callbacks (e.g. bufferRequested) acquire mutex_ under that same lock -
+  // causing an ABBA deadlock in multi-threaded environments (e.g. free-threaded
+  // Python).
   if (VLOG_IS_ON(1)) {
     size_t dropped = 0;
     CUPTI_CALL(cuptiActivityGetNumDroppedRecords(ctx, streamId, &dropped));
@@ -319,18 +296,15 @@ void CuptiActivityApi::bufferCompleted(
     }
   }
 }
-#endif
 
 void CuptiActivityApi::enableCuptiActivities(
     const std::set<ActivityType>& selected_activities,
     bool enablePerThreadBuffers) {
-#ifdef HAS_CUPTI
   // Lazily support re-init of CUPTI Callbacks, if they were finalized before.
-  auto cbapi_ = CuptiCallbackApi::singleton();
-  if (!tracingEnabled_ && !cbapi_->initSuccess() && cuptiLazyInit_()) {
-    reenableCuptiCallbacks_(cbapi_);
+  auto& cbapi = CuptiCallbackApi::singleton();
+  if ((tracingEnabled_ == 0u) && !cbapi.initSuccess() && cuptiLazyInit_()) {
+    reenableCuptiCallbacks_(cbapi);
   }
-  cbapi_.reset();
 
   if (enablePerThreadBuffers) {
 #if (CUDART_VERSION >= 12030)
@@ -394,7 +368,6 @@ void CuptiActivityApi::enableCuptiActivities(
   }
 
   tracingEnabled_ = 1;
-#endif
 
   // Explicitly enabled, so reset this flag if set
   stopCollection = false;
@@ -402,7 +375,6 @@ void CuptiActivityApi::enableCuptiActivities(
 
 void CuptiActivityApi::disableCuptiActivities(
     const std::set<ActivityType>& selected_activities) {
-#ifdef HAS_CUPTI
   for (const auto& activity : selected_activities) {
     if (activity == ActivityType::GPU_MEMCPY) {
       CUPTI_CALL(cuptiActivityDisable(CUPTI_ACTIVITY_KIND_MEMCPY));
@@ -431,11 +403,9 @@ void CuptiActivityApi::disableCuptiActivities(
     }
   }
   externalCorrelationEnabled_ = false;
-#endif // HAS_CUPTI
 }
 
 void CuptiActivityApi::teardownContext() {
-#ifdef HAS_CUPTI
   if (!tracingEnabled_) {
     return;
   }
@@ -449,10 +419,10 @@ void CuptiActivityApi::teardownContext() {
     // PyTorch Profiler is synchronous, so teardown needs to be run async in
     // this thread.
     std::thread teardownThread([&] {
-      auto cbapi_ = CuptiCallbackApi::singleton();
-      if (!cbapi_->initSuccess()) {
-        cbapi_->initCallbackApi();
-        if (!cbapi_->initSuccess()) {
+      auto& cbapi = CuptiCallbackApi::singleton();
+      if (!cbapi.initSuccess()) {
+        cbapi.initCallbackApi();
+        if (!cbapi.initSuccess()) {
           LOG(WARNING) << "CUPTI Callback failed to init, skipping teardown";
           tearingDown_ = 0;
           return;
@@ -460,9 +430,8 @@ void CuptiActivityApi::teardownContext() {
       }
       // Subscribe callbacks to call cuptiFinalize in the exit callback of these
       // APIs
-      bool status = cbapi_->enableCallbackDomain(CUPTI_CB_DOMAIN_RUNTIME_API);
-      status =
-          status && cbapi_->enableCallbackDomain(CUPTI_CB_DOMAIN_DRIVER_API);
+      bool status = cbapi.enableCallbackDomain(CUPTI_CB_DOMAIN_RUNTIME_API);
+      status = status && cbapi.enableCallbackDomain(CUPTI_CB_DOMAIN_DRIVER_API);
       if (!status) {
         LOG(WARNING)
             << "CUPTI Callback failed to enable for domain, skipping teardown";
@@ -474,7 +443,7 @@ void CuptiActivityApi::teardownContext() {
       CUPTI_CALL(cuptiActivityFlushAll(CUPTI_ACTIVITY_FLAG_FLUSH_FORCED));
 
       LOG(INFO) << "  CUPTI subscriber before finalize:"
-                << cbapi_->getCuptiSubscriber();
+                << cbapi.getCuptiSubscriber();
       teardownCupti_ = 1;
       std::unique_lock<std::mutex> lck(finalizeMutex_);
       finalizeCond_.wait(lck, [&] { return teardownCupti_ == 0; });
@@ -485,19 +454,17 @@ void CuptiActivityApi::teardownContext() {
       tracingEnabled_ = 0;
 
       // Remove the callbacks used specifically for cuptiFinalize
-      cbapi_->disableCallbackDomain(CUPTI_CB_DOMAIN_RUNTIME_API);
-      cbapi_->disableCallbackDomain(CUPTI_CB_DOMAIN_DRIVER_API);
+      cbapi.disableCallbackDomain(CUPTI_CB_DOMAIN_RUNTIME_API);
+      cbapi.disableCallbackDomain(CUPTI_CB_DOMAIN_DRIVER_API);
 
       // Re-init CUPTI Callbacks if Lazy Re-init is not enabled.
       if (!cuptiLazyInit_()) {
-        reenableCuptiCallbacks_(cbapi_);
+        reenableCuptiCallbacks_(cbapi);
       }
-      cbapi_.reset();
       tearingDown_ = 0;
     });
     teardownThread.detach();
   }
-#endif
 }
 
 } // namespace KINETO_NAMESPACE

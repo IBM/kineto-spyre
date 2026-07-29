@@ -36,8 +36,7 @@ class LoggerCollector : public ILoggerObserver {
     buckets_[ot].push_back(message);
   }
 
-  const std::map<LoggerOutputType, std::vector<std::string>>
-  extractCollectorMetadata() override {
+  const std::map<LoggerOutputType, std::vector<std::string>> extractCollectorMetadata() override {
     return buckets_;
   }
 
@@ -65,7 +64,7 @@ class LoggerCollector : public ILoggerObserver {
     }
   }
 
-  void addMetadata(const std::string& key, const std::string& value) override {}
+  void addMetadata([[maybe_unused]] const std::string& key, [[maybe_unused]] const std::string& value) override {}
 
  protected:
   std::map<LoggerOutputType, std::vector<std::string>> buckets_;

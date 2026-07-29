@@ -23,6 +23,9 @@
 #include "CuptiRangeProfiler.h"
 #include "EventProfilerController.h"
 #endif
+#ifdef HAS_ROCTRACER
+#include "RocprofLogger.h"
+#endif
 #ifdef HAS_XPUPTI
 #include "plugin/xpupti/XpuptiActivityApi.h"
 #include "plugin/xpupti/XpuptiActivityProfiler.h"
@@ -66,9 +69,9 @@ bool enableEventProfiler() {
 }
 
 static void initProfilersCallback(
-    CUpti_CallbackDomain /*domain*/,
-    CUpti_CallbackId /*cbid*/,
-    const CUpti_CallbackData* /*cbInfo*/) {
+    [[maybe_unused]] CUpti_CallbackDomain domain,
+    [[maybe_unused]] CUpti_CallbackId cbid,
+    [[maybe_unused]] const CUpti_CallbackData* cbInfo) {
   VLOG(0) << "CUDA Context created";
   initProfilers();
 
@@ -94,26 +97,26 @@ bool setupCuptiInitCallback(bool logOnError) {
   // libcupti will be lazily loaded on this call.
   // If it is not available (e.g. CUDA is not installed),
   // then this call will return an error and we just abort init.
-  auto cbapi = CuptiCallbackApi::singleton();
-  cbapi->initCallbackApi();
+  auto& cbapi = CuptiCallbackApi::singleton();
+  cbapi.initCallbackApi();
 
   bool status = false;
 
-  if (cbapi->initSuccess()) {
+  if (cbapi.initSuccess()) {
     const CUpti_CallbackDomain domain = CUPTI_CB_DOMAIN_RESOURCE;
-    status = cbapi->registerCallback(
+    status = cbapi.registerCallback(
         domain,
         CuptiCallbackApi::RESOURCE_CONTEXT_CREATED,
         initProfilersCallback);
     if (status) {
-      status = cbapi->enableCallback(
+      status = cbapi.enableCallback(
           domain, CuptiCallbackApi::RESOURCE_CONTEXT_CREATED);
     }
   }
 
-  if (!cbapi->initSuccess() || !status) {
+  if (!cbapi.initSuccess() || !status) {
     if (logOnError) {
-      CUPTI_CALL(cbapi->getCuptiStatus());
+      CUPTI_CALL(cbapi.getCuptiStatus());
       LOG(WARNING) << "CUPTI initialization failed - "
                    << "CUDA profiler activities will be missing";
       LOG(INFO)
@@ -134,7 +137,7 @@ static std::unique_ptr<CuptiRangeProfilerInit> rangeProfilerInit;
 using namespace KINETO_NAMESPACE;
 extern "C" {
 
-void libkineto_init(bool cpuOnly, bool logOnError) {
+void libkineto_init(bool cpuOnly, [[maybe_unused]] bool logOnError) {
   // Start with initializing the log level
   const char* logLevelEnv = getenv("KINETO_LOG_LEVEL");
   if (logLevelEnv) {
@@ -152,25 +155,27 @@ void libkineto_init(bool cpuOnly, bool logOnError) {
 #endif
 
 #ifdef HAS_CUPTI
-  bool initRangeProfiler = true;
-
   if (!cpuOnly && !libkineto::isDaemonEnvVarSet()) {
     bool success = setupCuptiInitCallback(logOnError);
     cpuOnly = !success;
-    initRangeProfiler = success;
-  }
-
-  // Initialize CUPTI Range Profiler API
-  // Note: the following is a no-op if Range Profiler is not supported
-  // currently it is only enabled in fbcode.
-  if (!cpuOnly && initRangeProfiler) {
-    rangeProfilerInit = std::make_unique<CuptiRangeProfilerInit>();
+    // Initialize CUPTI Range Profiler API
+    if constexpr (kHasCuptiRangeProfiler) {
+      if (success) {
+        rangeProfilerInit = std::make_unique<CuptiRangeProfilerInit>();
+      }
+    }
   }
 
   if (!cpuOnly && shouldPreloadCuptiInstrumentation()) {
     CuptiActivityApi::forceLoadCupti();
   }
 #endif // HAS_CUPTI
+
+#ifdef HAS_ROCTRACER
+  if (!cpuOnly) {
+    RocprofLogger::ensureRegistered();
+  }
+#endif
 
   ConfigLoader& config_loader = libkineto::api().configLoader();
   libkineto::api().registerProfiler(
@@ -182,19 +187,9 @@ void libkineto_init(bool cpuOnly, bool logOnError) {
       []() -> std::unique_ptr<IActivityProfiler> {
         auto returnCode = ptiViewGPULocalAvailable();
         if (returnCode != PTI_SUCCESS) {
-          std::string errPrefixMsg(
-              "Fail to enable Kineto Profiler on XPU due to error code: ");
-          errPrefixMsg = errPrefixMsg + std::to_string(returnCode);
-#if PTI_VERSION_AT_LEAST(0, 10)
-          std::string errMsg(ptiResultTypeToString(returnCode));
-          throw std::runtime_error(
-              errPrefixMsg + std::string(". The detailed error message is: ") +
-              errMsg);
-#else
-          throw std::runtime_error(errPrefixMsg);
-#endif
+          throwXpuRuntimeError(
+              "Fail to enable Kineto Profiler on XPU.", returnCode);
         }
-
         XpuptiScopeProfilerConfig::registerFactory();
         return std::make_unique<XPUActivityProfiler>();
       });

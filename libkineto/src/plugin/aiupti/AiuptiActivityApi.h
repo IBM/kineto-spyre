@@ -24,21 +24,19 @@ class AiuptiActivityApi {
 
   static AiuptiActivityApi& singleton();
 
-  static void pushCorrelationID(int id, CorrelationFlowType type);
+  static void pushCorrelationID([[maybe_unused]] int id, CorrelationFlowType type);
   static void popCorrelationID(CorrelationFlowType type);
 
-  void enableAiuptiActivities(
-      const std::set<ActivityType>& selected_activities);
+  void enableAiuptiActivities(const std::set<ActivityType>& selected_activities);
   void disablePtiActivities(const std::set<ActivityType>& selected_activities);
   void clearActivities();
 
   virtual std::unique_ptr<AiuptiActivityBufferDeque> activityBuffers();
 
-  virtual const std::pair<int, int> processActivities(
-      AiuptiActivityBufferDeque&,
-      std::function<void(const Pti_Activity*)> handler);
+  virtual const std::pair<int, int> processActivities(AiuptiActivityBufferDeque&,
+                                                      std::function<void(const Pti_Activity*)> handler);
 
-  void setMaxBufferSize(int size);
+  void setMaxBufferSize(int64_t size);
   // void setDeviceBufferSize(size_t size);
   // void setDeviceBufferPoolLimit(size_t limit);
 
@@ -46,28 +44,21 @@ class AiuptiActivityApi {
   int64_t flushOverhead{0};
 
  private:
-  int maxAiuBufferCount_{0};
+  int64_t maxAiuBufferCount_{0};
   AiuptiActivityBufferDeque allocatedAiuTraceBuffers_;
   std::unique_ptr<AiuptiActivityBufferDeque> readyAiuTraceBuffers_;
   std::mutex mutex_;
   std::atomic<uint32_t> tracingEnabled_{0};
   bool externalCorrelationEnabled_{false};
 
-  int processActivitiesForBuffer(
-      uint8_t* buf,
-      size_t validSize,
-      std::function<void(const Pti_Activity*)> handler);
+  int processActivitiesForBuffer(uint8_t* buf, size_t validSize, std::function<void(const Pti_Activity*)> handler);
 
-  static void bufferRequestedTrampoline(
-      uint8_t** buffer,
-      size_t* size,
-      size_t* maxNumRecords);
-  static void
-  bufferCompletedTrampoline(uint8_t* buffer, size_t size, size_t validSize);
+  static void bufferRequestedTrampoline(uint8_t** buffer, size_t* size, size_t* maxNumRecords);
+  static void bufferCompletedTrampoline(uint8_t* buffer, size_t size, size_t validSize);
 
  protected:
   void bufferRequested(uint8_t** buffer, size_t* size, size_t* maxNumRecords);
-  void bufferCompleted(uint8_t* buffer, size_t size, size_t validSize);
+  void bufferCompleted(uint8_t* buffer, [[maybe_unused]] size_t size, size_t validSize);
 };
 
 } // namespace KINETO_NAMESPACE

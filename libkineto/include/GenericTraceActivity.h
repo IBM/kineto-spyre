@@ -30,13 +30,9 @@ constexpr unsigned int kLinkAsyncCpuGpu = 2;
 // @lint-ignore-every CLANGTIDY cppcoreguidelines-pro-type-member-init
 class GenericTraceActivity : public ITraceActivity {
  public:
-  GenericTraceActivity()
-      : activityType(ActivityType::ENUM_COUNT), traceSpan_(nullptr) {}
+  GenericTraceActivity() : activityType(ActivityType::ENUM_COUNT), traceSpan_(nullptr) {}
 
-  GenericTraceActivity(
-      const TraceSpan& trace,
-      ActivityType type,
-      const std::string& name)
+  GenericTraceActivity(const TraceSpan& trace, ActivityType type, const std::string& name)
       : activityType(type), activityName(name), traceSpan_(&trace) {}
 
   int64_t deviceId() const override {
@@ -107,6 +103,17 @@ class GenericTraceActivity : public ITraceActivity {
     metadataMap_.emplace(key, std::make_pair(value, true));
   }
 
+  // Store a typed counter value. Preferred over addMetadata for counter
+  // activities — preserves full double precision and avoids the JSON
+  // serialize/deserialize round-trip in output backends.
+  void addCounterValue(const std::string& name, double value) {
+    counterValues_.emplace_back(name, value);
+  }
+
+  const std::vector<std::pair<std::string, double>>& counterValues() const override {
+    return counterValues_;
+  }
+
   const std::string getMetadataValue(const std::string& key) const override {
     if (auto it = metadataMap_.find(key); it != metadataMap_.end()) {
       return it->second.first;
@@ -154,6 +161,8 @@ class GenericTraceActivity : public ITraceActivity {
   const TraceSpan* traceSpan_;
   // Metadata map: { key: (value, quoted)}
   std::unordered_map<std::string, std::pair<std::string, bool>> metadataMap_;
+  // Typed counter values: (name, double) to avoid round-tripping though string
+  std::vector<std::pair<std::string, double>> counterValues_;
 };
 
 } // namespace libkineto

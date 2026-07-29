@@ -13,6 +13,7 @@
 
 #include <cassert>
 #include <chrono>
+#include <cstdint>
 #include <functional>
 #include <set>
 #include <string>
@@ -45,8 +46,7 @@ class Config : public AbstractConfig {
   }
 
   [[nodiscard]] bool activityProfilerEnabled() const {
-    return activityProfilerEnabled_ ||
-        activitiesOnDemandTimestamp_.time_since_epoch().count() > 0;
+    return activityProfilerEnabled_ || activitiesOnDemandTimestamp_.time_since_epoch().count() > 0;
   }
 
   // Log activitiy trace to this file
@@ -166,8 +166,7 @@ class Config : public AbstractConfig {
   // Monitor profiling threads and report when a thread is not responding
   // for a given number of seconds.
   // A period of 0 means disable.
-  [[nodiscard]] std::chrono::seconds eventProfilerHeartbeatMonitorPeriod()
-      const {
+  [[nodiscard]] std::chrono::seconds eventProfilerHeartbeatMonitorPeriod() const {
     return eventProfilerHeartbeatMonitorPeriod_;
   }
 
@@ -215,7 +214,7 @@ class Config : public AbstractConfig {
     return activitiesRunIterations_;
   }
 
-  [[nodiscard]] int activitiesMaxGpuBufferSize() const {
+  [[nodiscard]] int64_t activitiesMaxGpuBufferSize() const {
     return activitiesMaxGpuBufferSize_;
   }
 
@@ -237,8 +236,7 @@ class Config : public AbstractConfig {
   }
 
   // Timestamp at which the profiling to start, requested by the user.
-  [[nodiscard]] std::chrono::time_point<std::chrono::system_clock>
-  requestTimestamp() const {
+  [[nodiscard]] std::chrono::time_point<std::chrono::system_clock> requestTimestamp() const {
     if (profileStartTime_.time_since_epoch().count()) {
       return profileStartTime_;
     }
@@ -252,8 +250,7 @@ class Config : public AbstractConfig {
   }
 
   [[nodiscard]] bool hasProfileStartTime() const {
-    return requestTimestamp_.time_since_epoch().count() > 0 ||
-        profileStartTime_.time_since_epoch().count() > 0;
+    return requestTimestamp_.time_since_epoch().count() > 0 || profileStartTime_.time_since_epoch().count() > 0;
   }
 
   [[nodiscard]] int profileStartIteration() const {
@@ -307,25 +304,20 @@ class Config : public AbstractConfig {
     return onDemandConfigUpdateIntervalSecs_;
   }
 
-  static std::chrono::milliseconds alignUp(
-      std::chrono::milliseconds duration,
-      std::chrono::milliseconds alignment) {
+  static std::chrono::milliseconds alignUp(std::chrono::milliseconds duration, std::chrono::milliseconds alignment) {
     duration += alignment;
     return duration - (duration % alignment);
   }
 
-  [[nodiscard]] std::chrono::time_point<std::chrono::system_clock>
-  eventProfilerOnDemandStartTime() const {
+  [[nodiscard]] std::chrono::time_point<std::chrono::system_clock> eventProfilerOnDemandStartTime() const {
     return eventProfilerOnDemandTimestamp_;
   }
 
-  [[nodiscard]] std::chrono::time_point<std::chrono::system_clock>
-  eventProfilerOnDemandEndTime() const {
+  [[nodiscard]] std::chrono::time_point<std::chrono::system_clock> eventProfilerOnDemandEndTime() const {
     return eventProfilerOnDemandTimestamp_ + eventProfilerOnDemandDuration_;
   }
 
-  [[nodiscard]] std::chrono::time_point<std::chrono::system_clock>
-  activityProfilerRequestReceivedTime() const {
+  [[nodiscard]] std::chrono::time_point<std::chrono::system_clock> activityProfilerRequestReceivedTime() const {
     return activitiesOnDemandTimestamp_;
   }
 
@@ -368,13 +360,9 @@ class Config : public AbstractConfig {
   void printActivityProfilerConfig(std::ostream& s) const override;
   void setActivityDependentConfig() override;
 
-  void validate(
-      const std::chrono::time_point<std::chrono::system_clock>&
-          fallbackProfileStartTime) override;
+  void validate(const std::chrono::time_point<std::chrono::system_clock>& fallbackProfileStartTime) override;
 
-  static void addConfigFactory(
-      std::string name,
-      std::function<AbstractConfig*(Config&)> factory);
+  static void addConfigFactory(std::string name, std::function<AbstractConfig*(Config&)> factory);
 
   void print(std::ostream& s) const;
 
@@ -403,7 +391,7 @@ class Config : public AbstractConfig {
  private:
   explicit Config(const Config& other) = default;
 
-  AbstractConfig* cloneDerived(AbstractConfig& parent) const override {
+  AbstractConfig* cloneDerived([[maybe_unused]] AbstractConfig& parent) const override {
     // Clone from AbstractConfig not supported
     assert(false);
     return nullptr;
@@ -437,8 +425,7 @@ class Config : public AbstractConfig {
   // On-demand duration
   std::chrono::seconds eventProfilerOnDemandDuration_;
   // Last on-demand request
-  std::chrono::time_point<std::chrono::system_clock>
-      eventProfilerOnDemandTimestamp_;
+  std::chrono::time_point<std::chrono::system_clock> eventProfilerOnDemandTimestamp_;
 
   int eventProfilerMaxInstancesPerGpu_;
 
@@ -449,7 +436,7 @@ class Config : public AbstractConfig {
   // These settings can not be changed on-demand
   std::string eventLogFile_;
   std::vector<int> eventReportPercentiles_ = {5, 25, 50, 75, 95};
-  uint8_t eventProfilerDeviceMask_ = ~0;
+  uint8_t eventProfilerDeviceMask_ = static_cast<uint8_t>(~0);
   std::chrono::milliseconds multiplexPeriod_;
 
   // Activity profiler
@@ -467,7 +454,7 @@ class Config : public AbstractConfig {
   // Log activities to memory buffer
   bool activitiesLogToMemory_{false};
 
-  int activitiesMaxGpuBufferSize_;
+  int64_t activitiesMaxGpuBufferSize_;
   std::chrono::seconds activitiesWarmupDuration_;
   int activitiesWarmupIterations_;
   bool activitiesCudaSyncWaitEvents_;
@@ -495,8 +482,7 @@ class Config : public AbstractConfig {
   // Only profile nets with at least this many GPU operators
   int activitiesExternalAPIGpuOpCountThreshold_;
   // Last activity profiler request
-  std::chrono::time_point<std::chrono::system_clock>
-      activitiesOnDemandTimestamp_;
+  std::chrono::time_point<std::chrono::system_clock> activitiesOnDemandTimestamp_;
 
   // ActivityProfilers are triggered by either:
   // Synchronized start timestamps

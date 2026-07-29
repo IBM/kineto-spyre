@@ -45,7 +45,6 @@ class XpuptiActivityBuffer {
   size_t size_;
 };
 
-using XpuptiActivityBufferMap =
-    std::map<uint8_t*, std::unique_ptr<XpuptiActivityBuffer>>;
+using XpuptiActivityBufferMap = std::map<uint8_t*, std::unique_ptr<XpuptiActivityBuffer>>;
 
 } // namespace KINETO_NAMESPACE

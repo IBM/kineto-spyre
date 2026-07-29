@@ -39,6 +39,5 @@ class AiuptiActivityBuffer {
   size_t size_;
 };
 
-using AiuptiActivityBufferDeque =
-    std::deque<std::pair<uint8_t*, std::unique_ptr<AiuptiActivityBuffer>>>;
+using AiuptiActivityBufferDeque = std::deque<std::pair<uint8_t*, std::unique_ptr<AiuptiActivityBuffer>>>;
 } // namespace KINETO_NAMESPACE

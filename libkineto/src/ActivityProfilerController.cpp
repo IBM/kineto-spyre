@@ -16,9 +16,22 @@
 #include "ActivityLoggerFactory.h"
 #include "ActivityTrace.h"
 
+// TODO DEVICE_AGNOSTIC: Move the device decision out of C++ files to be
+//                       determined entirely by the build process. For the
+//                       controller, we'll need some registration mechanism.
+#if defined(HAS_CUPTI)
 #include "CuptiActivityApi.h"
-#ifdef HAS_ROCTRACER
+#include "CuptiActivityProfiler.h"
+
+#elif defined(HAS_ROCTRACER)
+#include "RocmActivityProfiler.h"
+
+#if defined(ROCTRACER_FALLBACK)
 #include "RoctracerActivityApi.h"
+#elif defined(HAS_ROCTRACER)
+#include "RocprofActivityApi.h"
+#endif
+
 #endif
 
 #include "ThreadUtil.h"
@@ -32,19 +45,21 @@ using namespace std::chrono;
 namespace KINETO_NAMESPACE {
 
 #if !USE_GOOGLE_LOG
-static std::shared_ptr<LoggerCollector>& loggerCollectorFactory() {
-  static std::shared_ptr<LoggerCollector> factory = nullptr;
-  return factory;
+namespace {
+std::vector<std::shared_ptr<LoggerCollector>>& loggerCollectors() {
+  static std::vector<std::shared_ptr<LoggerCollector>> collectors;
+  return collectors;
 }
+} // namespace
 
-void ActivityProfilerController::setLoggerCollectorFactory(
+void ActivityProfilerController::addLoggerCollectorFactory(
     const std::function<std::shared_ptr<LoggerCollector>()>& factory) {
-  loggerCollectorFactory() = factory();
+  loggerCollectors().push_back(factory());
 }
 
-std::shared_ptr<LoggerCollector>
-ActivityProfilerController::getLoggerCollector() {
-  return loggerCollectorFactory();
+std::vector<std::shared_ptr<LoggerCollector>> ActivityProfilerController::
+    getLoggerCollectors() {
+  return loggerCollectors();
 }
 #endif // !USE_GOOGLE_LOG
 
@@ -56,22 +71,28 @@ ActivityProfilerController::ActivityProfilerController(
   ChromeTraceBaseTime::singleton().init();
 
 #if !USE_GOOGLE_LOG
-  // Initialize LoggerCollector before ActivityProfiler to log
+  // Initialize LoggerCollectors before ActivityProfiler to log
   // CUPTI and CUDA driver versions.
-  if (loggerCollectorFactory()) {
-    // Keep a reference to the logger collector factory to handle safe
-    // static de-initialization.
-    loggerCollectorFactory_ = loggerCollectorFactory();
-    Logger::addLoggerObserver(loggerCollectorFactory_.get());
+  // Keep a reference to handle safe static de-initialization.
+  loggerCollectors_ = loggerCollectors();
+  for (auto& collector : loggerCollectors_) {
+    Logger::addLoggerObserver(collector.get());
   }
 #endif // !USE_GOOGLE_LOG
 
-#ifdef HAS_ROCTRACER
-  profiler_ = std::make_unique<CuptiActivityProfiler>(
-      RoctracerActivityApi::singleton(), cpuOnly);
-#else
+#if defined(HAS_CUPTI)
   profiler_ = std::make_unique<CuptiActivityProfiler>(
       CuptiActivityApi::singleton(), cpuOnly);
+#elif defined(HAS_ROCTRACER) && defined(ROCTRACER_FALLBACK)
+  profiler_ = std::make_unique<RocmActivityProfiler>(
+      RoctracerActivityApi::singleton(), cpuOnly);
+#elif defined(HAS_ROCTRACER)
+  profiler_ = std::make_unique<RocmActivityProfiler>(
+      RocprofActivityApi::singleton(), cpuOnly);
+#else
+  // CPU-only profiling without any GPU backends is handled
+  // directly by the GenericActivityProfiler.
+  profiler_ = std::make_unique<GenericActivityProfiler>(cpuOnly);
 #endif
   configLoader_.addHandler(ConfigLoader::ConfigKind::ActivityProfiler, this);
 }
@@ -89,8 +110,8 @@ ActivityProfilerController::~ActivityProfilerController() {
   }
 
 #if !USE_GOOGLE_LOG
-  if (loggerCollectorFactory()) {
-    Logger::removeLoggerObserver(loggerCollectorFactory_.get());
+  for (auto& collector : loggerCollectors_) {
+    Logger::removeLoggerObserver(collector.get());
   }
 #endif // !USE_GOOGLE_LOG
 }
@@ -242,7 +263,10 @@ void ActivityProfilerController::profilerLoop() {
       next_wakeup_time += Config::kControllerIntervalMsecs;
     }
 
-    if (profiler_->isActive() && !profiler_->isCollectingMemorySnapshot()) {
+    // Use syncTraceActive_ so we don't step into the loop while sync trace is
+    // running
+    if (profiler_->isActive() && !profiler_->isCollectingMemorySnapshot() &&
+        !syncTraceActive_) {
       next_wakeup_time = profiler_->performRunLoopStep(now, next_wakeup_time);
       VLOG(1) << "Profiler loop: "
               << duration_cast<milliseconds>(system_clock::now() - now).count()
@@ -368,6 +392,7 @@ void ActivityProfilerController::prepareTrace(const Config& config) {
   // requests from other sources (signal, daemon).
   // Cancel any ongoing request and refuse new ones.
   auto now = system_clock::now();
+  syncTraceActive_ = true;
   if (profiler_->isActive()) {
     LOG(WARNING) << "Cancelling current trace request in order to start "
                  << "higher priority synchronous request";
@@ -387,12 +412,47 @@ void ActivityProfilerController::toggleCollectionDynamic(const bool enable) {
 
 void ActivityProfilerController::startTrace() {
   UST_LOGGER_MARK_COMPLETED(kWarmUpStage);
+  USDT_EMIT_START_TRACE();
   profiler_->startTrace(std::chrono::system_clock::now());
 }
+bool ActivityProfilerController::isActive() {
+  return profiler_->isActive();
+}
 
-std::unique_ptr<ActivityTraceInterface>
-ActivityProfilerController::stopTrace() {
+void ActivityProfilerController::transferCpuTrace(
+    std::unique_ptr<libkineto::CpuTraceBuffer> cpuTrace) {
+  profiler_->transferCpuTrace(std::move(cpuTrace));
+}
+
+void ActivityProfilerController::recordThreadInfo() {
+  profiler_->recordThreadInfo();
+}
+
+void ActivityProfilerController::addChildActivityProfiler(
+    std::unique_ptr<IActivityProfiler> profiler) {
+  profiler_->addChildActivityProfiler(std::move(profiler));
+}
+
+void ActivityProfilerController::pushCorrelationId(uint64_t id) {
+  profiler_->pushCorrelationId(id);
+}
+
+void ActivityProfilerController::popCorrelationId() {
+  profiler_->popCorrelationId();
+}
+
+void ActivityProfilerController::pushUserCorrelationId(uint64_t id) {
+  profiler_->pushUserCorrelationId(id);
+}
+
+void ActivityProfilerController::popUserCorrelationId() {
+  profiler_->popUserCorrelationId();
+}
+
+std::unique_ptr<ActivityTraceInterface> ActivityProfilerController::
+    stopTrace() {
   profiler_->stopTrace(std::chrono::system_clock::now());
+  USDT_EMIT_STOP_TRACE();
   UST_LOGGER_MARK_COMPLETED(kCollectionStage);
   auto logger = std::make_unique<MemoryTraceLogger>(profiler_->config());
   profiler_->processTrace(*logger);
@@ -408,6 +468,7 @@ ActivityProfilerController::stopTrace() {
   logger->setLoggerMetadata(std::move(loggerMD));
 
   profiler_->reset();
+  syncTraceActive_ = false;
   return std::make_unique<ActivityTrace>(std::move(logger), loggerFactory());
 }
 

@@ -34,7 +34,7 @@ class MemoryTraceLogger : public ActivityLogger {
 
   // Note: the caller of these functions should handle concurrency
   // i.e., these functions are not thread-safe
-  void handleDeviceInfo(const DeviceInfo& info, uint64_t time) override {
+  void handleDeviceInfo(const DeviceInfo& info, int64_t time) override {
     deviceInfoList_.emplace_back(info, time);
   }
 
@@ -42,9 +42,9 @@ class MemoryTraceLogger : public ActivityLogger {
     resourceInfoList_.emplace_back(info, time);
   }
 
-  void handleOverheadInfo(const OverheadInfo& info, int64_t time) override {}
+  void handleOverheadInfo([[maybe_unused]] const OverheadInfo& info, [[maybe_unused]] int64_t time) override {}
 
-  void handleTraceSpan(const TraceSpan& span) override {
+  void handleTraceSpan([[maybe_unused]] const TraceSpan& span) override {
     // Handled separately
   }
 
@@ -63,19 +63,16 @@ class MemoryTraceLogger : public ActivityLogger {
     addActivityWrapper(activity);
   }
 
-  void handleTraceStart(
-      const std::unordered_map<std::string, std::string>& metadata,
-      const std::string& device_properties) override {
+  void handleTraceStart(const std::unordered_map<std::string, std::string>& metadata,
+                        const std::string& device_properties) override {
     metadata_ = metadata;
     device_properties_ = device_properties;
   }
 
-  void finalizeTrace(
-      const Config& config,
-      std::unique_ptr<ActivityBuffers> buffers,
-      int64_t endTime,
-      std::unordered_map<std::string, std::vector<std::string>>& metadata)
-      override {
+  void finalizeTrace([[maybe_unused]] const Config& config,
+                     std::unique_ptr<ActivityBuffers> buffers,
+                     int64_t endTime,
+                     [[maybe_unused]] std::unordered_map<std::string, std::vector<std::string>>& metadata) override {
     buffers_ = std::move(buffers);
     endTime_ = endTime;
   }
@@ -90,14 +87,14 @@ class MemoryTraceLogger : public ActivityLogger {
 
   void log(ActivityLogger& logger) {
     logger.handleTraceStart(metadata_, device_properties_);
-    for (auto& activity : activities_) {
-      activity->log(logger);
-    }
     for (auto& p : deviceInfoList_) {
       logger.handleDeviceInfo(p.first, p.second);
     }
     for (auto& p : resourceInfoList_) {
       logger.handleResourceInfo(p.first, p.second);
+    }
+    for (auto& activity : activities_) {
+      activity->log(logger);
     }
     for (auto& cpu_trace_buffer : buffers_->cpu) {
       logger.handleTraceSpan(cpu_trace_buffer->span);
@@ -106,8 +103,7 @@ class MemoryTraceLogger : public ActivityLogger {
     logger.finalizeTrace(*config_, nullptr, endTime_, loggerMetadata_);
   }
 
-  void setLoggerMetadata(
-      std::unordered_map<std::string, std::vector<std::string>>&& lmd) {
+  void setLoggerMetadata(std::unordered_map<std::string, std::vector<std::string>>&& lmd) {
     loggerMetadata_ = std::move(lmd);
   }
 

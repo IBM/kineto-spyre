@@ -10,6 +10,7 @@
 
 #include <memory>
 #include <set>
+#include <utility>
 #include <vector>
 
 #include "Config.h"
@@ -45,12 +46,8 @@ enum class TraceStatus {
  *   processes and gpu rows in the trace viewer.
  */
 struct DeviceInfo {
-  DeviceInfo(
-      int64_t id,
-      int64_t sortIndex,
-      const std::string& name,
-      const std::string& label)
-      : id(id), sortIndex(sortIndex), name(name), label(label) {}
+  DeviceInfo(int64_t id, int64_t sortIndex, std::string name, std::string label)
+      : id(id), sortIndex(sortIndex), name(std::move(name)), label(std::move(label)) {}
   int64_t id; // process id
   int64_t sortIndex; // position in trace view
   const std::string name; // process name
@@ -61,12 +58,8 @@ struct DeviceInfo {
  *   Can be used to specify resource inside device
  */
 struct ResourceInfo {
-  ResourceInfo(
-      int64_t deviceId,
-      int64_t id,
-      int64_t sortIndex,
-      const std::string& name)
-      : id(id), sortIndex(sortIndex), deviceId(deviceId), name(name) {}
+  ResourceInfo(int64_t deviceId, int64_t id, int64_t sortIndex, std::string name)
+      : id(id), sortIndex(sortIndex), deviceId(deviceId), name(std::move(name)) {}
   int64_t id; // resource id
   int64_t sortIndex; // position in trace view
   int64_t deviceId; // id of device which owns this resource (specified in
@@ -100,11 +93,10 @@ class IActivityProfilerSession {
   // processes trace activities using logger
   virtual void processTrace(ActivityLogger& logger) = 0;
 
-  virtual void processTrace(
-      ActivityLogger& logger,
-      getLinkedActivityCallback /*getLinkedActivity*/,
-      int64_t /*startTime*/,
-      int64_t /*endTime*/) {
+  virtual void processTrace(ActivityLogger& logger,
+                            [[maybe_unused]] getLinkedActivityCallback getLinkedActivity,
+                            [[maybe_unused]] int64_t startTime,
+                            [[maybe_unused]] int64_t endTime) {
     processTrace(logger);
   }
 
@@ -120,10 +112,10 @@ class IActivityProfilerSession {
   // XXX define trace formats
   // virtual save(string name, TraceFormat format)
 
-  virtual void pushCorrelationId(uint64_t /*id*/) {}
+  virtual void pushCorrelationId([[maybe_unused]] uint64_t id) {}
   virtual void popCorrelationId() {}
 
-  virtual void pushUserCorrelationId(uint64_t /*id*/) {}
+  virtual void pushUserCorrelationId([[maybe_unused]] uint64_t id) {}
   virtual void popUserCorrelationId() {}
 
   virtual std::string getDeviceProperties() {
@@ -152,21 +144,18 @@ class IActivityProfiler {
   [[nodiscard]] virtual const std::string& name() const = 0;
 
   // returns activity types this profiler supports
-  [[nodiscard]] virtual const std::set<ActivityType>& availableActivities()
-      const = 0;
+  [[nodiscard]] virtual const std::set<ActivityType>& availableActivities() const = 0;
 
   // Calls prepare() on registered tracer providers passing in the relevant
   // activity types. Returns a profiler session handle
-  virtual std::unique_ptr<IActivityProfilerSession> configure(
-      const std::set<ActivityType>& activity_types,
-      const Config& config) = 0;
+  virtual std::unique_ptr<IActivityProfilerSession> configure(const std::set<ActivityType>& activity_types,
+                                                              const Config& config) = 0;
 
   // asynchronous version of the above with future timestamp and duration.
-  virtual std::unique_ptr<IActivityProfilerSession> configure(
-      int64_t ts_ms,
-      int64_t duration_ms,
-      const std::set<ActivityType>& activity_types,
-      const Config& config) = 0;
+  virtual std::unique_ptr<IActivityProfilerSession> configure(int64_t ts_ms,
+                                                              int64_t duration_ms,
+                                                              const std::set<ActivityType>& activity_types,
+                                                              const Config& config) = 0;
 };
 
 } // namespace libkineto

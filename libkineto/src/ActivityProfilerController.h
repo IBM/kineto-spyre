@@ -14,6 +14,7 @@
 #include <memory>
 #include <mutex>
 #include <thread>
+#include <vector>
 
 // TODO(T90238193)
 // @lint-ignore-every CLANGTIDY facebook-hte-RelativeInclude
@@ -21,8 +22,7 @@
 #include "ActivityProfilerInterface.h"
 #include "ActivityTraceInterface.h"
 #include "ConfigLoader.h"
-#include "CuptiActivityApi.h"
-#include "CuptiActivityProfiler.h"
+#include "GenericActivityProfiler.h"
 #include "InvariantViolations.h"
 #include "LoggerCollector.h"
 
@@ -39,24 +39,19 @@ class ActivityProfilerController : public ConfigLoader::ConfigHandler {
  public:
   explicit ActivityProfilerController(ConfigLoader& configLoader, bool cpuOnly);
   ActivityProfilerController(const ActivityProfilerController&) = delete;
-  ActivityProfilerController& operator=(const ActivityProfilerController&) =
-      delete;
+  ActivityProfilerController& operator=(const ActivityProfilerController&) = delete;
 
   ~ActivityProfilerController();
 
 #if !USE_GOOGLE_LOG
-  static std::shared_ptr<LoggerCollector> getLoggerCollector();
-  static void setLoggerCollectorFactory(
-      const std::function<std::shared_ptr<LoggerCollector>()>& factory);
+  static void addLoggerCollectorFactory(const std::function<std::shared_ptr<LoggerCollector>()>& factory);
+  static std::vector<std::shared_ptr<LoggerCollector>> getLoggerCollectors();
 #endif // !USE_GOOGLE_LOG
 
-  static void addLoggerFactory(
-      const std::string& protocol,
-      ActivityLoggerFactory::FactoryFunc factory);
+  static void addLoggerFactory(const std::string& protocol, ActivityLoggerFactory::FactoryFunc factory);
 
   static void setInvariantViolationsLoggerFactory(
-      const std::function<std::unique_ptr<InvariantViolationsLogger>()>&
-          factory);
+      const std::function<std::unique_ptr<InvariantViolationsLogger>()>& factory);
 
   // These API are used for On-Demand Tracing.
   bool canAcceptConfig() override;
@@ -70,48 +65,32 @@ class ActivityProfilerController : public ConfigLoader::ConfigHandler {
   void step();
   std::unique_ptr<ActivityTraceInterface> stopTrace();
 
-  bool isActive() {
-    return profiler_->isActive();
-  }
+  bool isActive();
 
-  void transferCpuTrace(std::unique_ptr<libkineto::CpuTraceBuffer> cpuTrace) {
-    return profiler_->transferCpuTrace(std::move(cpuTrace));
-  }
+  void transferCpuTrace(std::unique_ptr<libkineto::CpuTraceBuffer> cpuTrace);
 
-  void recordThreadInfo() {
-    profiler_->recordThreadInfo();
-  }
+  void recordThreadInfo();
 
-  void addChildActivityProfiler(std::unique_ptr<IActivityProfiler> profiler) {
-    profiler_->addChildActivityProfiler(std::move(profiler));
-  }
+  void addChildActivityProfiler(std::unique_ptr<IActivityProfiler> profiler);
 
   void addMetadata(const std::string& key, const std::string& value);
 
-  void logInvariantViolation(
-      const std::string& profile_id,
-      const std::string& assertion,
-      const std::string& error,
-      const std::string& group_profile_id = "");
+  void logInvariantViolation(const std::string& profile_id,
+                             const std::string& assertion,
+                             const std::string& error,
+                             const std::string& group_profile_id = "");
 
-  void pushCorrelationId(uint64_t id) {
-    profiler_->pushCorrelationId(id);
-  }
-  void popCorrelationId() {
-    profiler_->popCorrelationId();
-  }
+  void pushCorrelationId(uint64_t id);
 
-  void pushUserCorrelationId(uint64_t id) {
-    profiler_->pushUserCorrelationId(id);
-  }
-  void popUserCorrelationId() {
-    profiler_->popUserCorrelationId();
-  }
+  void popCorrelationId();
+
+  void pushUserCorrelationId(uint64_t id);
+
+  void popUserCorrelationId();
 
  private:
   bool shouldActivateIterationConfig(int64_t currentIter);
-  bool shouldActivateTimestampConfig(
-      const std::chrono::time_point<std::chrono::system_clock>& now);
+  bool shouldActivateTimestampConfig(const std::chrono::time_point<std::chrono::system_clock>& now);
   void profilerLoop();
   void memoryProfilerLoop();
   void activateConfig(std::chrono::time_point<std::chrono::system_clock> now);
@@ -119,11 +98,12 @@ class ActivityProfilerController : public ConfigLoader::ConfigHandler {
   std::unique_ptr<Config> asyncRequestConfig_;
   std::mutex asyncConfigLock_;
 
-  std::unique_ptr<CuptiActivityProfiler> profiler_;
+  std::unique_ptr<GenericActivityProfiler> profiler_;
   std::unique_ptr<ActivityLogger> logger_;
-  std::shared_ptr<LoggerCollector> loggerCollectorFactory_;
+  std::vector<std::shared_ptr<LoggerCollector>> loggerCollectors_;
   std::thread* profilerThreads_[ThreadType::THREAD_MAX_COUNT] = {nullptr};
   std::atomic_bool stopRunloop_{false};
+  std::atomic_bool syncTraceActive_{false};
   std::atomic<std::int64_t> iterationCount_{-1};
   ConfigLoader& configLoader_;
 };

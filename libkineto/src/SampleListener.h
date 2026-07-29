@@ -54,7 +54,7 @@ class SampleValue {
     if (isDouble()) {
       dbl_ *= x;
     } else {
-      int_ = std::round(int_ * x);
+      int_ = static_cast<int64_t>(std::round(int_ * x));
     }
   }
 
@@ -142,8 +142,7 @@ class SampleListener {
   virtual ~SampleListener() = default;
 
   // Report bucketed & aggregated values for event
-  virtual void
-  handleSample(int device, const Sample& sample, bool from_new_version) = 0;
+  virtual void handleSample(int device, const Sample& sample, bool from_new_version) = 0;
 
   virtual void update(const Config& config) = 0;
 

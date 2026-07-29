@@ -26,6 +26,14 @@ endif()
 
 include_directories(${LIBKINETO_DIR})
 link_libraries(fmt::fmt-header-only)
+# ApproximateClockTest
+add_executable(ApproximateClockTest ApproximateClockTest.cpp)
+target_link_libraries(ApproximateClockTest PRIVATE
+    gtest_main
+    kineto_base kineto_api
+    ${XPU_XPUPTI_LIBRARY})
+gtest_discover_tests(ApproximateClockTest)
+
 # ConfigTest
 add_executable(ConfigTest ConfigTest.cpp)
 target_link_libraries(ConfigTest PRIVATE
@@ -36,14 +44,14 @@ gtest_discover_tests(ConfigTest)
 
 if(NOT LIBKINETO_NOCUPTI)
 # CuptiActivityProfilerTest
-#[[
 add_executable(CuptiActivityProfilerTest
     CuptiActivityProfilerTest.cpp
     MockActivitySubProfiler.cpp)
 target_link_libraries(CuptiActivityProfilerTest PRIVATE
     gtest_main
     gmock
-    kineto_base kineto_api)
+    kineto_base kineto_api
+    nlohmann_json::nlohmann_json)
 target_include_directories(CuptiActivityProfilerTest PRIVATE
     "${LIBKINETO_DIR}"
     "${LIBKINETO_DIR}/include"
@@ -51,7 +59,6 @@ target_include_directories(CuptiActivityProfilerTest PRIVATE
     "${CUDA_SOURCE_DIR}/include"
     "${CUPTI_INCLUDE_DIR}")
 gtest_discover_tests(CuptiActivityProfilerTest)
-]]
 # CuptiCallbackApiTest
 add_executable(CuptiCallbackApiTest CuptiCallbackApiTest.cpp)
 target_link_libraries(CuptiCallbackApiTest PRIVATE
@@ -60,15 +67,12 @@ target_link_libraries(CuptiCallbackApiTest PRIVATE
 gtest_discover_tests(CuptiCallbackApiTest)
 
 # CuptiRangeProfilerApiTest
-# add_executable(CuptiRangeProfilerApiTest CuptiRangeProfilerApiTest.cpp)
-# target_link_libraries(CuptiRangeProfilerApiTest PRIVATE
-#     gtest_main
-#     kineto
-#     CUDA::cupti
-#     $<BUILD_INTERFACE:fmt::fmt-header-only>)
-# Skipping due to SEGFault in 12.4
-# Tracked here: https://github.com/pytorch/kineto/issues/949
-# gtest_discover_tests(CuptiRangeProfilerApiTest)
+add_executable(CuptiRangeProfilerApiTest CuptiRangeProfilerApiTest.cpp)
+target_link_libraries(CuptiRangeProfilerApiTest PRIVATE
+    gtest_main
+    kineto_base kineto_api
+    $<BUILD_INTERFACE:fmt::fmt-header-only>)
+gtest_discover_tests(CuptiRangeProfilerApiTest)
 
 # CuptiRangeProfilerConfigTest
 add_executable(CuptiRangeProfilerConfigTest CuptiRangeProfilerConfigTest.cpp)
@@ -79,15 +83,12 @@ target_link_libraries(CuptiRangeProfilerConfigTest PRIVATE
 gtest_discover_tests(CuptiRangeProfilerConfigTest)
 
 # CuptiRangeProfilerTest
-# add_executable(CuptiRangeProfilerTest CuptiRangeProfilerTest.cpp)
-# target_link_libraries(CuptiRangeProfilerTest PRIVATE
-#     gtest_main
-#     kineto
-#     CUDA::cupti
-#     $<BUILD_INTERFACE:fmt::fmt-header-only>)
-# Skipping due to SEGFault in 12.4
-# Tracked here: https://github.com/pytorch/kineto/issues/949
-# gtest_discover_tests(CuptiRangeProfilerTest)
+add_executable(CuptiRangeProfilerTest CuptiRangeProfilerTest.cpp)
+target_link_libraries(CuptiRangeProfilerTest PRIVATE
+    gtest_main
+    kineto_base kineto_api
+    $<BUILD_INTERFACE:fmt::fmt-header-only>)
+gtest_discover_tests(CuptiRangeProfilerTest)
 
 # CuptiStringsTest
 add_executable(CuptiStringsTest CuptiStringsTest.cpp)
@@ -103,6 +104,28 @@ target_link_libraries(EventProfilerTest PRIVATE
     gmock
     kineto_base kineto_api)
 gtest_discover_tests(EventProfilerTest)
+endif()
+
+if(NOT LIBKINETO_NOROCTRACER)
+# RocmActivityProfilerTest
+add_executable(RocmActivityProfilerTest
+    RocmActivityProfilerTest.cpp
+    MockActivitySubProfiler.cpp)
+target_compile_definitions(RocmActivityProfilerTest PRIVATE
+    "__HIP_PLATFORM_HCC__"
+    "__HIP_PLATFORM_AMD__")
+target_link_libraries(RocmActivityProfilerTest PRIVATE
+    gtest_main
+    gmock
+    kineto_base kineto_api
+    nlohmann_json::nlohmann_json)
+target_include_directories(RocmActivityProfilerTest PRIVATE
+    "${LIBKINETO_DIR}"
+    "${LIBKINETO_DIR}/include"
+    "${LIBKINETO_DIR}/src"
+    "${ROCM_INCLUDE_DIRS}"
+    "${ROCTRACER_INCLUDE_DIR}")
+gtest_discover_tests(RocmActivityProfilerTest)
 endif()
 
 # LoggerObserverTest
@@ -122,9 +145,11 @@ target_link_libraries(PidInfoTest PRIVATE
 gtest_discover_tests(PidInfoTest)
 
 # CuptiProfilerApiTest
+# TODO: Re-enable once runtime crash in cuptiDeviceGetChipName is fixed.
 # enable_language(CUDA)
 # add_executable(CuptiProfilerApiTest CuptiProfilerApiTest.cu)
 # target_link_libraries(CuptiProfilerApiTest PRIVATE
-#     kineto
+#     kineto_base kineto_api
+#     CUDA::cuda_driver
 #     gtest_main)
-#add_test(NAME CuptiProfilerApiTest_ COMMAND CuptiProfilerApiTest)
+# add_test(NAME CuptiProfilerApiTest COMMAND CuptiProfilerApiTest)

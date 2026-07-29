@@ -6,7 +6,6 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-#ifdef HAS_CUPTI
 #include <cuda_runtime_api.h>
 #if defined(USE_CUPTI_RANGE_PROFILER) && defined(CUDART_VERSION) && \
     CUDART_VERSION > 10000 && CUDART_VERSION < 12060
@@ -14,7 +13,6 @@
 #include <nvperf_host.h>
 #include <nvperf_target.h>
 #endif // cuda version > 10.00 and < 11.04
-#endif // HAS_CUPTI
 
 // TODO(T90238193)
 // @lint-ignore-every CLANGTIDY facebook-hte-RelativeInclude
@@ -523,25 +521,25 @@ CuptiProfilerResult evalMetricValues(
 #else
 
 bool getProfilerConfigImage(
-    const std::string& /*chipName*/,
-    const std::vector<std::string>& /*metricNames*/,
-    std::vector<uint8_t>& /*configImage*/,
-    const uint8_t* /*counterAvailabilityImage*/) {
+    [[maybe_unused]] const std::string& chipName,
+    [[maybe_unused]] const std::vector<std::string>& metricNames,
+    [[maybe_unused]] std::vector<uint8_t>& configImage,
+    [[maybe_unused]] const uint8_t* counterAvailabilityImage) {
   return false;
 }
 
 bool getCounterDataPrefixImage(
-    const std::string& /*chipName*/,
-    const std::vector<std::string>& /*metricNames*/,
-    std::vector<uint8_t>& /*counterDataImagePrefix*/) {
+    [[maybe_unused]] const std::string& chipName,
+    [[maybe_unused]] const std::vector<std::string>& metricNames,
+    [[maybe_unused]] std::vector<uint8_t>& counterDataImagePrefix) {
   return false;
 }
 
 CuptiProfilerResult evalMetricValues(
-    const std::string& /*chipName*/,
-    const std::vector<uint8_t>& /*counterDataImage*/,
-    const std::vector<std::string>& /*metricNames*/,
-    bool /*verbose*/) {
+    [[maybe_unused]] const std::string& chipName,
+    [[maybe_unused]] const std::vector<uint8_t>& counterDataImage,
+    [[maybe_unused]] const std::vector<std::string>& metricNames,
+    [[maybe_unused]] bool verbose) {
   return {};
 }
 

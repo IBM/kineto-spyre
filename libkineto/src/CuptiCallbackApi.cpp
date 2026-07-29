@@ -52,19 +52,14 @@ constexpr uint32_t MAX_CUPTI_CALLBACK_ID_ALL = 0xffffffff;
  *   b) avoid dynamic memory allocations
  *   c) be aware of locking overheads
  */
-#ifdef HAS_CUPTI
 static void CUPTIAPI callback_switchboard(
-#else
-static void callback_switchboard(
-#endif
     void* /* unused */,
     CUpti_CallbackDomain domain,
     CUpti_CallbackId cbid,
     const CUpti_CallbackData* cbInfo) {
-
-  // below statement is likey going to call a mutex
-  // on the singleton access
-  CuptiCallbackApi::singleton()->__callback_switchboard(domain, cbid, cbInfo);
+  // __callback_switchboard acquires a reader lock
+  // on the callback list
+  CuptiCallbackApi::singleton().__callback_switchboard(domain, cbid, cbInfo);
 }
 
 void CuptiCallbackApi::__callback_switchboard(
@@ -139,10 +134,10 @@ void CuptiCallbackApi::__callback_switchboard(
   // make a copy of the callback list so we avoid holding lock
   // in common case this should be just one func pointer copy
   std::array<CuptiCallbackFn, MAX_CB_FNS_PER_CB> callbacks;
-  int num_cbs = 0;
+  size_t num_cbs = 0;
   {
     ReaderLockGuard rl(callbackLock_);
-    int i = 0;
+    size_t i = 0;
     for (auto it = cblist->begin();
          it != cblist->end() && i < MAX_CB_FNS_PER_CB;
          it++, i++) {
@@ -151,26 +146,23 @@ void CuptiCallbackApi::__callback_switchboard(
     num_cbs = i;
   }
 
-  for (int i = 0; i < num_cbs; i++) {
+  for (size_t i = 0; i < num_cbs; i++) {
     auto fn = callbacks[i];
     fn(domain, cbid, cbInfo);
   }
 }
 
-std::shared_ptr<CuptiCallbackApi> CuptiCallbackApi::singleton() {
-  static const std::shared_ptr<CuptiCallbackApi> instance = [] {
-    std::shared_ptr<CuptiCallbackApi> inst =
-        std::make_shared<CuptiCallbackApi>();
-    return inst;
-  }();
-  return instance;
+CuptiCallbackApi& CuptiCallbackApi::singleton() {
+  static auto* instance = new CuptiCallbackApi();
+  return *instance;
 }
 
 void CuptiCallbackApi::initCallbackApi() {
-#ifdef HAS_CUPTI
   lastCuptiStatus_ = CUPTI_ERROR_UNKNOWN;
   lastCuptiStatus_ = CUPTI_CALL_NOWARN(cuptiSubscribe(
-      &subscriber_, (CUpti_CallbackFunc)callback_switchboard, nullptr));
+      &subscriber_,
+      reinterpret_cast<CUpti_CallbackFunc>(callback_switchboard),
+      nullptr));
 
   // TODO: Remove temporarily to work around static initialization order issue
   // betweent this and GLOG.
@@ -179,7 +171,6 @@ void CuptiCallbackApi::initCallbackApi() {
   // }
 
   initSuccess_ = (lastCuptiStatus_ == CUPTI_SUCCESS);
-#endif
 }
 
 CuptiCallbackApi::CallbackList* CuptiCallbackApi::CallbackTable::lookup(
@@ -266,60 +257,51 @@ bool CuptiCallbackApi::deleteCallback(
 bool CuptiCallbackApi::enableCallback(
     CUpti_CallbackDomain domain,
     CUpti_CallbackId cbid) {
-#ifdef HAS_CUPTI
   if (initSuccess_) {
     lastCuptiStatus_ =
         CUPTI_CALL_NOWARN(cuptiEnableCallback(1, subscriber_, domain, cbid));
     enabledCallbacks_.insert({domain, cbid});
     return (lastCuptiStatus_ == CUPTI_SUCCESS);
   }
-#endif
   return false;
 }
 
 bool CuptiCallbackApi::disableCallback(
     CUpti_CallbackDomain domain,
     CUpti_CallbackId cbid) {
-#ifdef HAS_CUPTI
   enabledCallbacks_.erase({domain, cbid});
   if (initSuccess_) {
     lastCuptiStatus_ =
         CUPTI_CALL_NOWARN(cuptiEnableCallback(0, subscriber_, domain, cbid));
     return (lastCuptiStatus_ == CUPTI_SUCCESS);
   }
-#endif
   return false;
 }
 
 bool CuptiCallbackApi::enableCallbackDomain(CUpti_CallbackDomain domain) {
-#ifdef HAS_CUPTI
   if (initSuccess_) {
     lastCuptiStatus_ =
         CUPTI_CALL_NOWARN(cuptiEnableDomain(1, subscriber_, domain));
     enabledCallbacks_.insert({domain, MAX_CUPTI_CALLBACK_ID_ALL});
     return (lastCuptiStatus_ == CUPTI_SUCCESS);
   }
-#endif
   return false;
 }
 
 bool CuptiCallbackApi::disableCallbackDomain(CUpti_CallbackDomain domain) {
-#ifdef HAS_CUPTI
   enabledCallbacks_.erase({domain, MAX_CUPTI_CALLBACK_ID_ALL});
   if (initSuccess_) {
     lastCuptiStatus_ =
         CUPTI_CALL_NOWARN(cuptiEnableDomain(0, subscriber_, domain));
     return (lastCuptiStatus_ == CUPTI_SUCCESS);
   }
-#endif
   return false;
 }
 
 bool CuptiCallbackApi::reenableCallbacks() {
-#ifdef HAS_CUPTI
   if (initSuccess_) {
     for (auto& cbpair : enabledCallbacks_) {
-      if ((uint32_t)cbpair.second == MAX_CUPTI_CALLBACK_ID_ALL) {
+      if (static_cast<uint32_t>(cbpair.second) == MAX_CUPTI_CALLBACK_ID_ALL) {
         lastCuptiStatus_ =
             CUPTI_CALL_NOWARN(cuptiEnableDomain(1, subscriber_, cbpair.first));
       } else {
@@ -329,7 +311,6 @@ bool CuptiCallbackApi::reenableCallbacks() {
     }
     return (lastCuptiStatus_ == CUPTI_SUCCESS);
   }
-#endif
   return false;
 }
 
