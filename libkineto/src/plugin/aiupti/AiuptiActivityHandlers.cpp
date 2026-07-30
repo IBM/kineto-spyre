@@ -174,6 +174,14 @@ inline std::string runtimeCbidName(AIUpti_runtime_api_trace_cbid cbid) {
       return "aiuClockCalibration";
     case AIUPTI_RUNTIME_TRACE_CBID_COMPILE_GRAPH:
       return "aiuCompileGraph";
+    case AIUPTI_RUNTIME_TRACE_CBID_PARSE_RESPONSE:
+      return "aiuParseResponse";
+    case AIUPTI_RUNTIME_TRACE_CBID_ISSUE_CALLBACK:
+      return "aiuIssueCallback";
+    case AIUPTI_RUNTIME_TRACE_CBID_VERIFY_ASYC_MSGS:
+      return "aiuVerifyAsyncMsgs";
+    case AIUPTI_RUNTIME_TRACE_CBID_SPYRE_CODE_HOST_COMPUTE:
+      return "aiuSpyreCodeHostCompute";
     default:
       break;
   }
